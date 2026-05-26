@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-ink-50 text-ink-800 font-sans;
+  }
+
+  * {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-500 focus-visible:ring-offset-2;
+  }
+}
+
+@layer components {
+  /* Active reading line highlight */
+  .line-active {
+    @apply bg-focus-50 border-l-2 border-focus-500 text-ink-900;
+  }
+
+  /* Inactive reading lines */
+  .line-inactive {
+    @apply text-ink-300 border-l-2 border-transparent;
+  }
+
+  /* Previously read lines */
+  .line-read {
+    @apply text-ink-400 border-l-2 border-transparent;
+  }
+
+  /* Progress bar fill */
+  .progress-fill {
+    transition: width 0.3s ease-out;
+  }
+
+  /* Smooth line transitions */
+  .reading-line {
+    @apply transition-all duration-150 ease-out px-4 py-1 rounded-r-md cursor-pointer select-none;
+  }
+}
+
+@layer utilities {
+  /* Prevent text selection during keyboard navigation */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Subtle scrollbar */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-ink-200 rounded-full;
+  }
+}
