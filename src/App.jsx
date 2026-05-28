@@ -97,6 +97,8 @@ export default function App() {
     }
     setInputText('')
     setReadingMeta(null)
+    // Return to Dashboard if the user came from there; otherwise back to Landing.
+    // Landing now shows reading history so it's always a useful destination.
     setView(loadAssignments().length > 0 ? 'dashboard' : 'landing')
   }
 
@@ -123,7 +125,8 @@ export default function App() {
         <LandingView
           onStartReading={handleStartReading}
           initialTab={landingTab}
-          onBack={loadAssignments().length > 0 ? handleGoToDashboard : null}
+          onBack={handleGoToDashboard}
+          onContinueReading={handleContinueReading}
         />
       )}
       {view === 'dashboard' && (
