@@ -3,6 +3,9 @@
 :: Downloads: https://github.com/your-org/focus-reader
 :: Requires: Node.js 18+  ->  https://nodejs.org
 
+:: Always run from the directory containing this script.
+cd /d "%~dp0"
+
 echo.
 echo   Focus Reader
 echo   ------------

@@ -5,6 +5,10 @@
 
 set -e
 
+# Always run from the directory containing this script,
+# regardless of where it was launched from.
+cd "$(dirname "$0")"
+
 echo ""
 echo "  📖 Focus Reader"
 echo "  ───────────────"
