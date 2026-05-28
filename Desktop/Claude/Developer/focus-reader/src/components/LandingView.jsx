@@ -5,11 +5,13 @@ import { loadAssignments, saveAssignments, clearAssignments,
 import SyllabusParser from './SyllabusParser.jsx'
 import TodayView from './TodayView.jsx'
 import CourseManager from './CourseManager.jsx'
+import SettingsModal from './SettingsModal.jsx'
 
 // Sprint 1: text paste only.
 // Sprint 2: PDF/DOCX file upload via unified input handler.
 // Sprint 5: My Schedule tab — syllabus parser + today view.
 // Sprint 6+: CourseManager embedded in My Schedule tab.
+// Sprint 8: pass file metadata to onStartReading; gear icon for Settings.
 
 const PLACEHOLDER = `Paste your reading here — an article, textbook chapter, PDF text, or anything you need to get through.
 
@@ -26,6 +28,9 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
   const [isExtracting, setIsExtracting] = useState(false)
   const [extractError, setExtractError] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  // Sprint 8: track uploaded filename so we can pass it to history
+  const [uploadedFileName, setUploadedFileName] = useState(null)
   const textareaRef = useRef(null)
   const fileInputRef = useRef(null)
 
@@ -37,7 +42,11 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
       return
     }
     setError('')
-    onStartReading(trimmed)
+    // Pass source metadata so App can create the history record with the right title
+    onStartReading(trimmed, {
+      source:   uploadedFileName ? uploadedFileName.split('.').pop().toLowerCase() : 'paste',
+      fileName: uploadedFileName ?? null,
+    })
   }
 
   function handleKeyDown(e) {
@@ -55,11 +64,13 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
     }
     setIsExtracting(true)
     setExtractError('')
+    setUploadedFileName(null)
     try {
       const extracted = ext === 'pdf'
         ? await extractFromPDF(file)
         : await extractFromDOCX(file)
       setText(extracted.trim())
+      setUploadedFileName(file.name)  // Sprint 8: preserve for history title
       setInputMode('paste')
     } catch (err) {
       setExtractError(
@@ -145,8 +156,23 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
                 ← Dashboard
               </button>
             )}
-            <span className="text-xs text-ink-400 font-mono">v1.0 · Sprint 6</span>
+            {/* Sprint 8: Settings gear */}
+            <button
+              onClick={() => setShowSettings(true)}
+              aria-label="Settings"
+              className="w-7 h-7 flex items-center justify-center rounded-lg
+                         text-ink-400 hover:text-ink-700 hover:bg-ink-100
+                         transition-colors duration-150"
+            >
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <path fillRule="evenodd" clipRule="evenodd"
+                  d="M6.16 1.56a.75.75 0 0 1 1.48-.12l.1.6a4.5 4.5 0 0 1 1.5.87l.57-.22a.75.75 0 0 1 .95.96l-.22.56a4.5 4.5 0 0 1 .87 1.5l.6.1a.75.75 0 0 1-.12 1.48l-.6.1a4.5 4.5 0 0 1-.87 1.5l.22.57a.75.75 0 0 1-.96.95l-.56-.22a4.5 4.5 0 0 1-1.5.87l-.1.6a.75.75 0 0 1-1.48-.12l-.1-.6a4.5 4.5 0 0 1-1.5-.87l-.57.22a.75.75 0 0 1-.95-.96l.22-.56a4.5 4.5 0 0 1-.87-1.5l-.6-.1a.75.75 0 0 1 .12-1.48l.6-.1a4.5 4.5 0 0 1 .87-1.5l-.22-.57a.75.75 0 0 1 .96-.95l.56.22a4.5 4.5 0 0 1 1.5-.87l.1-.6ZM7.5 9.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"
+                  fill="currentColor"/>
+              </svg>
+            </button>
+            <span className="text-xs text-ink-400 font-mono">v1.0 · Sprint 8</span>
           </div>
+          {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
         </div>
       </header>
 
@@ -197,7 +223,7 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
               <textarea
                 ref={textareaRef}
                 value={text}
-                onChange={e => { setText(e.target.value); setError('') }}
+                onChange={e => { setText(e.target.value); setError(''); if (uploadedFileName) setUploadedFileName(null) }}
                 onKeyDown={handleKeyDown}
                 placeholder={PLACEHOLDER}
                 rows={14}
@@ -354,9 +380,20 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
           ))}
         </div>
 
-        {/* Privacy note */}
-        <p className="mt-10 text-xs text-ink-300 text-center">
-          No account required. Your text is processed locally in your browser — nothing is sent to our servers.
+        {/* FR-26: Privacy disclosure */}
+        <p className="mt-10 text-xs text-ink-300 text-center leading-relaxed">
+          No account required · Your text is never stored ·{' '}
+          <span className="text-ink-400">
+            AI features (section analysis, quiz, syllabus parsing) send your text to{' '}
+            <a
+              href="https://www.anthropic.com/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-ink-500 transition-colors"
+            >
+              Anthropic's API
+            </a>
+          </span>
         </p>
 
       </main>

@@ -1,32 +1,59 @@
 // Text processing utilities for Focus Reader
 // All functions are pure — no side effects, no API calls.
 
-// Split raw text into an array of non-empty lines.
-// Preserves paragraph breaks as empty-line separators for visual rhythm.
+// Split raw text into an array of lines.
+// Lines starting with § are "block lines" — consecutive § lines are grouped
+// into a single array entry so FocusReader can render them as a block card.
+// Non-block logic: preserves paragraph breaks, collapses consecutive blanks.
+//
+// Block entry format:  "§First line\nSecond line\nThird line\n..."
+// (The § prefix marks the whole entry; content follows after slicing it off.)
 export function parseLines(rawText) {
   if (!rawText || typeof rawText !== 'string') return []
 
-  return rawText
-    .split('\n')
-    .map(line => line.trimEnd())        // remove trailing whitespace
-    .filter((line, i, arr) => {
-      // Remove consecutive blank lines — keep at most one
-      if (line === '') {
-        return i === 0 || arr[i - 1] !== ''
+  const raw = rawText.split('\n').map(l => l.trimEnd())
+  const out = []
+  let i = 0
+
+  while (i < raw.length) {
+    const line = raw[i]
+
+    // ── Block group: collect consecutive § lines ─────────────────
+    if (line.startsWith('§')) {
+      const blockItems = []
+      while (i < raw.length && raw[i].startsWith('§')) {
+        blockItems.push(raw[i].slice(1).trimStart())
+        i++
       }
-      return true
-    })
-    .filter((line, i, arr) => {
-      // Remove leading/trailing blank lines
-      if (i === 0 || i === arr.length - 1) return line !== ''
-      return true
-    })
+      out.push('§' + blockItems.join('\n'))
+      continue
+    }
+
+    // ── Blank line: keep at most one ─────────────────────────────
+    if (line === '') {
+      if (out.length > 0 && out[out.length - 1] !== '') out.push('')
+      i++; continue
+    }
+
+    // ── Regular line ─────────────────────────────────────────────
+    out.push(line)
+    i++
+  }
+
+  // Trim leading / trailing blank entries
+  while (out.length > 0 && out[0] === '')            out.shift()
+  while (out.length > 0 && out[out.length - 1] === '') out.pop()
+
+  return out
 }
 
 // Count words in a string.
+// Block lines (§-prefixed) have the marker stripped before counting;
+// embedded \n within a block entry counts as whitespace naturally.
 export function countWords(text) {
   if (!text || typeof text !== 'string') return 0
-  return text.trim().split(/\s+/).filter(Boolean).length
+  const t = text.startsWith('§') ? text.slice(1) : text
+  return t.trim().split(/\s+/).filter(Boolean).length
 }
 
 // Count total words across all lines.
@@ -61,4 +88,22 @@ export function isBlankLine(line) {
 // Estimate pages from word count (250 words per page is standard).
 export function wordsToPages(wordCount) {
   return Math.ceil(wordCount / 250)
+}
+
+// Group lines into paragraphs (runs of non-blank lines separated by blank lines).
+// Returns: Array<{ startLine: number, endLine: number }>
+export function parseParagraphs(lines) {
+  const paragraphs = []
+  let start = null
+  for (let i = 0; i < lines.length; i++) {
+    const blank = lines[i].trim() === ''
+    if (!blank && start === null) {
+      start = i
+    } else if (blank && start !== null) {
+      paragraphs.push({ startLine: start, endLine: i - 1 })
+      start = null
+    }
+  }
+  if (start !== null) paragraphs.push({ startLine: start, endLine: lines.length - 1 })
+  return paragraphs
 }

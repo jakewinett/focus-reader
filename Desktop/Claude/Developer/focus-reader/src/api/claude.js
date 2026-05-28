@@ -2,17 +2,105 @@
 // Sprint 3: section chunking + previews.
 // Sprint 4: retention quiz generation.
 // Sprint 5: syllabus parsing.
-// Sprint 7 will replace the direct browser fetch with a Vercel Edge Function proxy.
+// Sprint 7: navigator.onLine guard (FR-27) + Vercel Edge Function proxy (FR-25).
 
-const API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY
-const API_URL = 'https://api.anthropic.com/v1/messages'
 const MODEL   = 'claude-haiku-4-5-20251001'
+const IS_PROD = import.meta.env.PROD
+
+// Two transport modes:
+//
+//  Key present (dev env var OR user-entered key in Settings):
+//    Browser → Anthropic directly, using the dangerous-direct-browser-access header.
+//
+//  No key + production (Vercel):
+//    Browser → /api/claude (Edge Function) → Anthropic
+//    ANTHROPIC_API_KEY is set in the Vercel dashboard (server-side only).
+//
+// In either mode the app degrades gracefully when neither transport is available.
+
+// Sprint 8: read the API key dynamically at call time so a key entered via the
+// in-app Settings panel takes effect without a page reload.
+function getApiKey() {
+  try {
+    const stored = localStorage.getItem('focusreader_api_key')
+    if (stored?.trim()) return stored.trim()
+  } catch { /* localStorage blocked (e.g. private browsing with strict settings) */ }
+  const env = import.meta.env.VITE_ANTHROPIC_API_KEY
+  return (env && env !== 'your_key_here') ? env : null
+}
+
+// Returns true when at least one transport path is available.
+function canCallAPI() {
+  return Boolean(getApiKey()) || IS_PROD
+}
+
+// ── FR-27: Offline guard ──────────────────────────────────────────────────────
+// Throws a typed error when the browser reports no network.
+// App.jsx listens for this to show a visible offline banner.
+function assertOnline() {
+  if (!navigator.onLine) {
+    const err = new Error(
+      "You're offline. Connect to the internet to use AI features."
+    )
+    err.code = 'OFFLINE'
+    throw err
+  }
+}
+
+// ── Shared transport ──────────────────────────────────────────────────────────
+async function callClaude({ max_tokens, messages }) {
+  assertOnline()
+
+  const payload = { model: MODEL, max_tokens, messages }
+  const userKey = getApiKey()
+
+  let res
+  if (userKey) {
+    // Direct browser → Anthropic (dev env var or user-entered key from Settings)
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': userKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify(payload),
+    })
+  } else {
+    // Prod: browser → Vercel Edge Function proxy at /api/claude
+    res = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  }
+
+  if (!res.ok) {
+    const err = new Error(`Claude API error ${res.status}`)
+    err.code = 'API_ERROR'
+    err.status = res.status
+    throw err
+  }
+
+  return res.json()
+}
+
+// ── JSON extraction helper ────────────────────────────────────────────────────
+function extractJSON(text) {
+  return text
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim()
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
 
 // Analyses the text and returns logical section boundaries.
 // Returns: Promise<Array<{ title: string, startLine: number }>>
-// Silently returns [] on any error or missing key so the reader degrades gracefully.
+// Returns [] when no API transport is available.
 export async function analyzeText(lines) {
-  if (!API_KEY || API_KEY === 'your_key_here') return []
+  if (!canCallAPI()) return []
 
   const numbered = lines.map((l, i) => `${i}: ${l}`).join('\n')
 
@@ -32,28 +120,8 @@ Text (${lines.length} lines):
 ${numbered}`
 
   try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 512,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    })
-
-    if (!res.ok) return []
-
-    const data = await res.json()
-    const raw  = data.content?.[0]?.text ?? ''
-    // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
-    const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
-    const parsed = JSON.parse(stripped)
+    const data   = await callClaude({ max_tokens: 512, messages: [{ role: 'user', content: prompt }] })
+    const parsed = JSON.parse(extractJSON(data.content?.[0]?.text ?? ''))
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
@@ -62,9 +130,9 @@ ${numbered}`
 
 // Generates 4 multiple-choice retention questions from the text.
 // Returns: Promise<Array<{ question, options[4], correctIndex, sourceLine, explanation }>>
-// Silently returns null on any error or missing key.
+// Returns null when no API transport is available.
 export async function generateQuiz(lines) {
-  if (!API_KEY || API_KEY === 'your_key_here') return null
+  if (!canCallAPI()) return null
 
   const numbered = lines.map((l, i) => `${i}: ${l}`).join('\n')
 
@@ -84,27 +152,8 @@ Text (${lines.length} lines):
 ${numbered}`
 
   try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    })
-
-    if (!res.ok) return null
-
-    const data = await res.json()
-    const raw  = data.content?.[0]?.text ?? ''
-    const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
-    const parsed = JSON.parse(stripped)
+    const data   = await callClaude({ max_tokens: 1024, messages: [{ role: 'user', content: prompt }] })
+    const parsed = JSON.parse(extractJSON(data.content?.[0]?.text ?? ''))
     return Array.isArray(parsed) && parsed.length ? parsed : null
   } catch {
     return null
@@ -114,7 +163,7 @@ ${numbered}`
 // Parses a course syllabus and extracts reading assignments with due dates.
 // Returns: Promise<Array<{ title, course, dueDate }>> or [] on failure.
 export async function parseSyllabus(text) {
-  if (!API_KEY || API_KEY === 'your_key_here') return []
+  if (!canCallAPI()) return []
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -135,27 +184,8 @@ Syllabus text:
 ${text}`
 
   try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    })
-
-    if (!res.ok) return []
-
-    const data = await res.json()
-    const raw  = data.content?.[0]?.text ?? ''
-    const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
-    const parsed = JSON.parse(stripped)
+    const data   = await callClaude({ max_tokens: 1024, messages: [{ role: 'user', content: prompt }] })
+    const parsed = JSON.parse(extractJSON(data.content?.[0]?.text ?? ''))
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
