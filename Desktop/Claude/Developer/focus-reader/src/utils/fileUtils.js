@@ -133,6 +133,22 @@ function getBlockLabel(firstLine) {
 // Exported so FocusReader can call it.
 export { getBlockLabel }
 
+// Extract readable text from a <li> element.
+// li.textContent concatenates child nodes without spacing, so
+// <strong>Bold.</strong>Rest → "Bold.Rest". We fix this by:
+//   1. Joining each direct-child element's text with a space
+//      (handles <p>Title.</p><p>Body</p> structure)
+//   2. Applying a regex to add a space after sentence-ending punctuation
+//      before a capital letter (handles <strong>Title.</strong>Body in one <p>)
+function liText(li) {
+  const blocks = Array.from(li.children)
+  const raw = blocks.length > 0
+    ? blocks.map(c => c.textContent.trim()).filter(Boolean).join(' ')
+    : li.textContent.trim()
+  // "Foo.Bar" or "Foo.\"Bar" → "Foo. Bar" / "Foo. \"Bar"
+  return raw.replace(/([.!?])([“"A-Z])/g, '$1 $2')
+}
+
 function htmlToStructuredText(html) {
   // DOMParser is available in all browser contexts (this module is browser-only)
   const doc = new DOMParser().parseFromString(html, 'text/html')
@@ -164,7 +180,7 @@ function htmlToStructuredText(html) {
     // ── Standalone list → block card (3+ items) ─────────────────
     if (tag === 'ul' || tag === 'ol') {
       const items = Array.from(el.querySelectorAll(':scope > li'))
-        .map(li => li.textContent.trim()).filter(Boolean)
+        .map(liText).filter(Boolean)
       if (items.length >= 3) {
         out.push('', items.map(it => '§' + it).join('\n'), '')
       } else {
@@ -195,7 +211,7 @@ function htmlToStructuredText(html) {
           // Collect list items inline
           if (nextTag === 'ul' || nextTag === 'ol') {
             Array.from(next.querySelectorAll('li'))
-              .map(li => li.textContent.trim()).filter(Boolean)
+              .map(liText).filter(Boolean)
               .forEach(li => blockItems.push(li))
           } else if (nextTxt) {
             blockItems.push(nextTxt)
