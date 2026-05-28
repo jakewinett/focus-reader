@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { extractFromPDF, extractFromDOCX } from '../utils/fileUtils.js'
 import { loadAssignments, saveAssignments, clearAssignments,
          loadCourses, saveCourses } from '../storage/state.js'
+import { loadHistory } from '../storage/history.js'
 import SyllabusParser from './SyllabusParser.jsx'
 import TodayView from './TodayView.jsx'
 import CourseManager from './CourseManager.jsx'
@@ -19,7 +20,7 @@ Focus Reader will highlight one line at a time so you can move through it withou
 
 Paste anything above this line and hit Start Reading.`
 
-export default function LandingView({ onStartReading, initialTab = 'paste', onBack = null }) {
+export default function LandingView({ onStartReading, initialTab = 'paste', onBack = null, onContinueReading = null }) {
   const [text, setText]             = useState('')
   const [error, setError]           = useState('')
   const [inputMode, setInputMode]   = useState(initialTab)  // 'paste' | 'upload' | 'schedule'
@@ -31,8 +32,16 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
   const [showSettings, setShowSettings] = useState(false)
   // Sprint 8: track uploaded filename so we can pass it to history
   const [uploadedFileName, setUploadedFileName] = useState(null)
+  // Recent reading history loaded from IndexedDB on mount
+  const [recentReadings, setRecentReadings] = useState(null) // null = loading, [] = empty
   const textareaRef = useRef(null)
   const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    loadHistory()
+      .then(records => setRecentReadings(records.slice(0, 3)))
+      .catch(() => setRecentReadings([]))
+  }, [])
 
   function handleStart() {
     const trimmed = text.trim()
@@ -148,14 +157,12 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
             <span className="font-semibold text-ink-800 tracking-tight">Focus Reader</span>
           </div>
           <div className="flex items-center gap-3">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="text-xs text-ink-400 hover:text-ink-600 transition-colors flex items-center gap-1"
-              >
-                ← Dashboard
-              </button>
-            )}
+            <button
+              onClick={onBack}
+              className="text-xs text-ink-400 hover:text-ink-600 transition-colors flex items-center gap-1"
+            >
+              ← Dashboard
+            </button>
             {/* Sprint 8: Settings gear */}
             <button
               onClick={() => setShowSettings(true)}
@@ -363,6 +370,90 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
             </svg>
             {error}
           </p>
+        )}
+
+        {/* ── Pick up where you left off ──────────────────────── */}
+        {recentReadings && recentReadings.length > 0 && onContinueReading && (
+          <div className="mt-8 animate-fade-in">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-ink-700">Pick up where you left off</h2>
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="text-xs text-ink-400 hover:text-focus-600 transition-colors duration-150"
+                >
+                  View all →
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              {recentReadings.map(record => {
+                const pct = record.isComplete
+                  ? 100
+                  : Math.min(99, Math.round((record.lastLine / Math.max(record.totalLines, 1)) * 100))
+                const isNew       = record.lastLine === 0 && !record.isComplete
+                const ctaLabel    = record.isComplete ? 'Read again' : isNew ? 'Start →' : 'Continue →'
+                const fromStart   = record.isComplete
+
+                return (
+                  <div
+                    key={record.id}
+                    className="flex items-center gap-3 bg-white border border-ink-100 rounded-xl
+                               px-4 py-3 hover:border-ink-200 transition-colors group"
+                  >
+                    {/* Vertical progress fill on left edge */}
+                    <div className="shrink-0 w-1 h-10 bg-ink-100 rounded-full overflow-hidden self-center">
+                      <div
+                        className="w-full bg-focus-400 rounded-full transition-all duration-300"
+                        style={{ height: `${pct}%` }}
+                      />
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-ink-800 truncate leading-snug">
+                        {record.title}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {/* Source badge */}
+                        <span className={[
+                          'text-xs px-1.5 py-0.5 rounded font-medium',
+                          record.source === 'pdf'  ? 'bg-focus-50 text-focus-700' :
+                          record.source === 'docx' ? 'bg-sage-50 text-sage-700'  :
+                                                     'bg-ink-100 text-ink-500',
+                        ].join(' ')}>
+                          {record.source === 'pdf' ? 'PDF' : record.source === 'docx' ? 'DOCX' : 'Paste'}
+                        </span>
+                        <span className="text-ink-200 text-xs">·</span>
+                        <span className="text-xs text-ink-400">
+                          {record.wordCount.toLocaleString()} words
+                        </span>
+                        <span className="text-ink-200 text-xs">·</span>
+                        {record.isComplete ? (
+                          <span className="text-xs text-sage-600 font-medium">Complete ✓</span>
+                        ) : isNew ? (
+                          <span className="text-xs text-ink-400">Not started</span>
+                        ) : (
+                          <span className="text-xs text-ink-400">{pct}% read</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* CTA */}
+                    <button
+                      onClick={() => onContinueReading(record.id, { fromStart })}
+                      className="shrink-0 px-3 py-1.5 bg-ink-100 text-ink-600 text-xs font-medium
+                                 rounded-lg hover:bg-focus-600 hover:text-white active:scale-95
+                                 transition-all duration-150 whitespace-nowrap"
+                    >
+                      {ctaLabel}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         )}
 
         {/* How it works */}
