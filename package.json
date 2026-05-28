@@ -6,9 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:local": "vite preview --port 3000 --host localhost",
+    "start": "npm run build && npm run preview:local"
   },
   "dependencies": {
+    "idb": "^8.0.3",
     "mammoth": "^1.12.0",
     "pdfjs-dist": "^5.7.284",
     "react": "^18.2.0",

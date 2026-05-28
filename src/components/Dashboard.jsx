@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { loadAssignments, saveAssignments, clearAssignments, loadCourses } from '../storage/state.js'
+import SettingsModal from './SettingsModal.jsx'
+import HistoryZone from './HistoryZone.jsx'
 
 // Sprint 6: Dashboard — 3-zone layout.
-// FR-15: Zone 1 — right now card (single most urgent assignment).
-// FR-16: Zone 2 — this week list (5-item cap).
-// FR-17: Zone 3 — course progress cards.
-// FR-18: Route from dashboard to reader.
-// FR-28: Due-date sort with title tiebreak.
-// Props: { onGoToLanding(), onStartReading(), onReParse() }
+// Sprint 8: Zone 4 — reading history; Settings gear; onContinueReading prop.
+// Props: { onGoToLanding(), onStartReading(), onReParse(), onContinueReading() }
 
 const DAY_MS = 86_400_000
 
@@ -201,8 +199,9 @@ function CourseCard({ name, done, total, pct, teacher, schedule }) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-export default function Dashboard({ onGoToLanding, onStartReading, onReParse }) {
-  const [assignments, setAssignments] = useState(() => loadAssignments())
+export default function Dashboard({ onGoToLanding, onStartReading, onReParse, onContinueReading }) {
+  const [assignments, setAssignments]   = useState(() => loadAssignments())
+  const [showSettings, setShowSettings] = useState(false)
 
   function update(updated) {
     saveAssignments(updated)
@@ -283,7 +282,21 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse }) 
             <span className="font-semibold text-ink-800 tracking-tight">Focus Reader</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-ink-400 font-mono hidden sm:inline">v1.0 · Sprint 6</span>
+            <span className="text-xs text-ink-400 font-mono hidden sm:inline">v1.0 · Sprint 8</span>
+            {/* Sprint 8: Settings gear */}
+            <button
+              onClick={() => setShowSettings(true)}
+              aria-label="Settings"
+              className="w-7 h-7 flex items-center justify-center rounded-lg
+                         text-ink-400 hover:text-ink-700 hover:bg-ink-100
+                         transition-colors duration-150"
+            >
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <path fillRule="evenodd" clipRule="evenodd"
+                  d="M6.16 1.56a.75.75 0 0 1 1.48-.12l.1.6a4.5 4.5 0 0 1 1.5.87l.57-.22a.75.75 0 0 1 .95.96l-.22.56a4.5 4.5 0 0 1 .87 1.5l.6.1a.75.75 0 0 1-.12 1.48l-.6.1a4.5 4.5 0 0 1-.87 1.5l.22.57a.75.75 0 0 1-.96.95l-.56-.22a4.5 4.5 0 0 1-1.5.87l-.1.6a.75.75 0 0 1-1.48-.12l-.1-.6a4.5 4.5 0 0 1-1.5-.87l-.57.22a.75.75 0 0 1-.95-.96l.22-.56a4.5 4.5 0 0 1-.87-1.5l-.6-.1a.75.75 0 0 1 .12-1.48l.6-.1a4.5 4.5 0 0 1 .87-1.5l-.22-.57a.75.75 0 0 1 .96-.95l.56.22a4.5 4.5 0 0 1 1.5-.87l.1-.6ZM7.5 9.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"
+                  fill="currentColor"/>
+              </svg>
+            </button>
             <button
               onClick={onGoToLanding}
               className="px-3 py-1.5 text-xs font-medium text-ink-600 bg-ink-100
@@ -292,6 +305,7 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse }) 
               + Add a reading
             </button>
           </div>
+          {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
         </div>
       </header>
 
@@ -352,6 +366,14 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse }) 
             </div>
           </section>
         )}
+
+        {/* Zone 4 — Recent readings (Sprint 8) */}
+        <section>
+          <h2 className="text-xs font-mono text-ink-400 uppercase tracking-wide mb-3">
+            Recent readings
+          </h2>
+          <HistoryZone onContinueReading={onContinueReading} />
+        </section>
 
       </main>
 
