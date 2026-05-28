@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { parseLines, parseParagraphs, countWords, countTotalWords, calcProgress, formatMinutes, isBlankLine } from '../utils/textUtils.js'
+import { parseLines, parseParagraphs, countWords, countTotalWords, formatMinutes, isBlankLine } from '../utils/textUtils.js'
 import { getBlockLabel } from '../utils/fileUtils.js'
 import { useReadingPace, useFontSize } from '../hooks/useReadingPace.js'
 import { analyzeText, generateQuiz } from '../api/claude.js'
@@ -107,7 +107,10 @@ export default function FocusReader({
   const containerRef  = useRef(null)
   const activeLineRef = useRef(null)
 
-  const progress = calcProgress(currentIndex, totalLines)
+  // Progress: count only non-blank lines so blank separators don't dilute the percentage
+  const nonBlankTotal  = lines.filter(l => l !== '').length
+  const nonBlankPassed = lines.slice(0, currentIndex + 1).filter(l => l !== '').length
+  const progress = nonBlankTotal > 0 ? Math.round((nonBlankPassed / nonBlankTotal) * 100) : 0
 
   // ── Section analysis (Sprint 3) ──────────────────────────────
   useEffect(() => {
@@ -172,8 +175,10 @@ export default function FocusReader({
       })
     } else {
       setCurrentIndex(prev => {
-        if (prev >= totalLines - 1) { setIsComplete(true); return prev }
-        const next = prev + 1
+        // Skip past any blank separator lines to the next content line
+        let next = prev + 1
+        while (next < totalLines && lines[next] === '') next++
+        if (next >= totalLines) { setIsComplete(true); return prev }
         recordProgress(countWords(lines[prev]), countTotalWords(lines.slice(next)))
         return next
       })
@@ -189,10 +194,16 @@ export default function FocusReader({
         return next
       })
     } else {
-      setCurrentIndex(prev => Math.max(0, prev - 1))
+      setCurrentIndex(prev => {
+        if (prev <= 0) return 0
+        // Skip past any blank separator lines to the previous content line
+        let next = prev - 1
+        while (next > 0 && lines[next] === '') next--
+        return next
+      })
     }
     if (isComplete) setIsComplete(false)
-  }, [readMode, isComplete, paragraphs])
+  }, [readMode, isComplete, paragraphs, lines])
 
   // ── Keyboard handler ─────────────────────────────────────────
   useEffect(() => {
@@ -329,7 +340,7 @@ export default function FocusReader({
           <span className="text-xs text-ink-300 font-mono">
             {readMode === 'paragraph'
               ? `Para ${currentParaIndex + 1} of ${paragraphs.length}`
-              : `Line ${currentIndex + 1} of ${totalLines}`}
+              : `Line ${nonBlankPassed} of ${nonBlankTotal}`}
           </span>
 
           <div className="flex items-center gap-3">
