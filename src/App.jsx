@@ -2,17 +2,22 @@ import { useState, useEffect } from 'react'
 import LandingView from './components/LandingView.jsx'
 import FocusReader from './components/FocusReader.jsx'
 import Dashboard   from './components/Dashboard.jsx'
-import { loadAssignments } from './storage/state.js'
+import MigrationPrompt from './components/MigrationPrompt.jsx'
+import { useAppAuth } from './lib/AuthContext.jsx'
+import { setSupabaseToken, SUPABASE_ENABLED } from './lib/supabase.js'
+import { setAuthToken, clearAuthToken } from './api/claude.js'
+import { hasMigrationBeenOffered, getAnonDocCount } from './lib/auth.js'
 import {
+  initHistory,
+  loadHistory,
   createHistoryRecord,
   saveReadingPosition,
   getHistoryRecord,
 } from './storage/history.js'
+import { initState, loadAssignments } from './storage/state.js'
 
 // View states: 'landing' | 'dashboard' | 'reader'
-// Sprint 6: dashboard added.
-// Sprint 7: offline banner.
-// Sprint 8: reading history (IndexedDB), continue-reading, settings.
+// Sprint 9: Clerk auth, Supabase cloud storage, anonymous session limits.
 
 // ── Offline banner ────────────────────────────────────────────────────────────
 function OfflineBanner() {
@@ -35,16 +40,26 @@ function OfflineBanner() {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [view, setView]             = useState(() =>
-    loadAssignments().length > 0 ? 'dashboard' : 'landing'
-  )
-  const [inputText, setInputText]   = useState('')
-  const [landingTab, setLandingTab] = useState('paste')
-  const [isOnline, setIsOnline]     = useState(() => navigator.onLine)
+  const { isLoaded, isSignedIn, userId, getToken } = useAppAuth()
 
-  // Sprint 8: track the active reading session for history save/resume
+  const [view, setView]               = useState('landing')
+  const [inputText, setInputText]     = useState('')
+  const [landingTab, setLandingTab]   = useState('paste')
+  const [isOnline, setIsOnline]       = useState(() => navigator.onLine)
   const [readingMeta, setReadingMeta] = useState(null)
   // Shape: { sessionId: string, initialLine: number } | null
+
+  // Sprint 9: migration prompt state
+  const [showMigration, setShowMigration]       = useState(false)
+  const [localSessionCount, setLocalSessionCount] = useState(0)
+
+  // Set initial view after async assignment load
+  useEffect(() => {
+    if (!isLoaded) return
+    loadAssignments().then(a => {
+      setView(a.length > 0 ? 'dashboard' : 'landing')
+    })
+  }, [isLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // FR-27: online/offline listener
   useEffect(() => {
@@ -58,10 +73,39 @@ export default function App() {
     }
   }, [])
 
+  // Sprint 9: wire auth tokens and initialise storage when sign-in state changes
+  useEffect(() => {
+    if (!isLoaded) return
+
+    if (isSignedIn && userId) {
+      // Refresh Supabase session token and pass to API module
+      getToken({ template: 'supabase' }).then(token => {
+        if (token) {
+          setSupabaseToken(token)
+          setAuthToken(token)
+        }
+      })
+      initHistory(userId)
+      initState(userId)
+
+      // Show migration prompt once if local sessions exist and haven't been offered
+      if (SUPABASE_ENABLED && !hasMigrationBeenOffered()) {
+        loadHistory({ localOnly: true }).then(records => {
+          if (records.length > 0) {
+            setLocalSessionCount(records.length)
+            setShowMigration(true)
+          }
+        })
+      }
+    } else {
+      clearAuthToken()
+      initHistory(null)
+      initState(null)
+    }
+  }, [isLoaded, isSignedIn, userId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Reading session handlers ──────────────────────────────────────────────
 
-  // Called by LandingView when user clicks "Start Reading"
-  // meta: { source: 'paste'|'pdf'|'docx', fileName: string|null }
   async function handleStartReading(text, meta = {}) {
     const sessionId = await createHistoryRecord({
       rawText:  text,
@@ -73,7 +117,6 @@ export default function App() {
     setView('reader')
   }
 
-  // Called by HistoryZone via Dashboard — resume or restart a past session
   async function handleContinueReading(historyId, { fromStart = false } = {}) {
     const record = await getHistoryRecord(historyId)
     if (!record) return
@@ -85,8 +128,6 @@ export default function App() {
     setView('reader')
   }
 
-  // Called by FocusReader's Exit button (and Quiz done/back buttons)
-  // pos: { lastLine: number, isComplete: boolean }
   async function handleExitReader(pos = {}) {
     if (readingMeta?.sessionId && pos.lastLine != null) {
       await saveReadingPosition({
@@ -97,9 +138,7 @@ export default function App() {
     }
     setInputText('')
     setReadingMeta(null)
-    // Return to Dashboard if the user came from there; otherwise back to Landing.
-    // Landing now shows reading history so it's always a useful destination.
-    setView(loadAssignments().length > 0 ? 'dashboard' : 'landing')
+    loadAssignments().then(a => setView(a.length > 0 ? 'dashboard' : 'landing'))
   }
 
   // ── Navigation helpers ────────────────────────────────────────────────────
@@ -109,17 +148,23 @@ export default function App() {
     setView('landing')
   }
 
-  function handleGoToDashboard() {
-    setView('dashboard')
-  }
+  function handleGoToDashboard() { setView('dashboard') }
+  function handleReParse()       { handleGoToLanding('schedule') }
 
-  function handleReParse() {
-    handleGoToLanding('schedule')
-  }
+  // Hold render until Clerk resolves auth (avoids flash of wrong view)
+  if (!isLoaded) return null
 
   return (
     <div className="min-h-screen">
       {!isOnline && <OfflineBanner />}
+
+      {showMigration && (
+        <MigrationPrompt
+          userId={userId}
+          localCount={localSessionCount}
+          onDone={() => setShowMigration(false)}
+        />
+      )}
 
       {view === 'landing' && (
         <LandingView

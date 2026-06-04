@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { UserButton } from '@clerk/clerk-react'
 import { loadAssignments, saveAssignments, clearAssignments, loadCourses } from '../storage/state.js'
 import SettingsModal from './SettingsModal.jsx'
 import HistoryZone from './HistoryZone.jsx'
+
+const CLERK_ENABLED = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
 // Sprint 6: Dashboard — 3-zone layout.
 // Sprint 8: Zone 4 — reading history; Settings gear; onContinueReading prop.
@@ -200,11 +203,18 @@ function CourseCard({ name, done, total, pct, teacher, schedule }) {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export default function Dashboard({ onGoToLanding, onStartReading, onReParse, onContinueReading }) {
-  const [assignments, setAssignments]   = useState(() => loadAssignments())
+  const [assignments, setAssignments]   = useState([])
+  const [courses, setCourses]           = useState([])
   const [showSettings, setShowSettings] = useState(false)
 
+  // Load assignments and courses (async — works for both localStorage and Supabase)
+  useEffect(() => {
+    loadAssignments().then(setAssignments)
+    loadCourses().then(setCourses)
+  }, [])
+
   function update(updated) {
-    saveAssignments(updated)
+    saveAssignments(updated) // async, fire-and-forget — local state updates immediately
     setAssignments(updated)
   }
 
@@ -221,8 +231,8 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
     onStartReading()
   }
 
-  function handleReParse() {
-    clearAssignments()
+  async function handleReParse() {
+    await clearAssignments()
     onReParse()
   }
 
@@ -242,8 +252,7 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
 
   // Zone 3: course progress (FR-17) — only show when 2+ distinct courses
   // Merge assignment counts with saved course metadata (teacher, schedule)
-  const savedCourses   = loadCourses()
-  const courseMetaMap  = Object.fromEntries(savedCourses.map(c => [c.name, c]))
+  const courseMetaMap  = Object.fromEntries(courses.map(c => [c.name, c]))
   const courseMap = {}
   for (const a of assignments) {
     const key = a.course?.trim() || 'Other'
@@ -251,7 +260,7 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
     courseMap[key].total++
     if (a.status === 'done') courseMap[key].done++
   }
-  const courses = Object.entries(courseMap)
+  const courseProgress = Object.entries(courseMap)
     .map(([name, { done, total }]) => {
       const meta = courseMetaMap[name] ?? {}
       return {
@@ -262,7 +271,7 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
       }
     })
     .sort((a, b) => a.pct - b.pct || a.name.localeCompare(b.name))
-  const showCourses = courses.length >= 2
+  const showCourses = courseProgress.length >= 2
 
   // ── Render ────────────────────────────────────────────────────
   return (
@@ -282,8 +291,10 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
             <span className="font-semibold text-ink-800 tracking-tight">Focus Reader</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-ink-400 font-mono hidden sm:inline">v1.0 · Sprint 8</span>
-            {/* Sprint 8: Settings gear */}
+            <span className="text-xs text-ink-400 font-mono hidden sm:inline">v1.0 · Sprint 9</span>
+            {/* Sprint 9: User account button — only rendered when Clerk is configured */}
+            {CLERK_ENABLED && <UserButton afterSignOutUrl="/" />}
+            {/* Settings gear */}
             <button
               onClick={() => setShowSettings(true)}
               aria-label="Settings"
@@ -360,7 +371,7 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
               Course progress
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {courses.map(c => (
+              {courseProgress.map(c => (
                 <CourseCard key={c.name} {...c} />
               ))}
             </div>

@@ -1,12 +1,21 @@
 import { useState, useEffect, useRef } from 'react'
+import { UserButton } from '@clerk/clerk-react'
 import { extractFromPDF, extractFromDOCX } from '../utils/fileUtils.js'
 import { loadAssignments, saveAssignments, clearAssignments,
          loadCourses, saveCourses } from '../storage/state.js'
 import { loadHistory } from '../storage/history.js'
+import { useAppAuth } from '../lib/AuthContext.jsx'
+import {
+  getAnonDocCount, incrementAnonDoc,
+  ANON_DOC_LIMIT,
+} from '../lib/auth.js'
+import AuthGate from './AuthGate.jsx'
 import SyllabusParser from './SyllabusParser.jsx'
 import TodayView from './TodayView.jsx'
 import CourseManager from './CourseManager.jsx'
 import SettingsModal from './SettingsModal.jsx'
+
+const CLERK_ENABLED = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
 // Sprint 1: text paste only.
 // Sprint 2: PDF/DOCX file upload via unified input handler.
@@ -21,23 +30,28 @@ Focus Reader will highlight one line at a time so you can move through it withou
 Paste anything above this line and hit Start Reading.`
 
 export default function LandingView({ onStartReading, initialTab = 'paste', onBack = null, onContinueReading = null }) {
+  const { isSignedIn } = useAppAuth()
+
   const [text, setText]             = useState('')
   const [error, setError]           = useState('')
   const [inputMode, setInputMode]   = useState(initialTab)  // 'paste' | 'upload' | 'schedule'
-  const [assignments, setAssignments] = useState(() => loadAssignments())
-  const [courses, setCourses]         = useState(() => loadCourses())
+  const [assignments, setAssignments] = useState([])
+  const [courses, setCourses]         = useState([])
   const [isExtracting, setIsExtracting] = useState(false)
   const [extractError, setExtractError] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showAuthGate, setShowAuthGate] = useState(false)
   // Sprint 8: track uploaded filename so we can pass it to history
   const [uploadedFileName, setUploadedFileName] = useState(null)
-  // Recent reading history loaded from IndexedDB on mount
+  // Recent reading history loaded from IndexedDB / Supabase on mount
   const [recentReadings, setRecentReadings] = useState(null) // null = loading, [] = empty
   const textareaRef = useRef(null)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
+    loadAssignments().then(setAssignments)
+    loadCourses().then(setCourses)
     loadHistory()
       .then(records => setRecentReadings(records.slice(0, 3)))
       .catch(() => setRecentReadings([]))
@@ -51,7 +65,16 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
       return
     }
     setError('')
-    // Pass source metadata so App can create the history record with the right title
+
+    // Sprint 9: enforce anonymous session limit when Clerk is configured
+    if (CLERK_ENABLED && !isSignedIn) {
+      if (getAnonDocCount() >= ANON_DOC_LIMIT) {
+        setShowAuthGate(true)
+        return
+      }
+      incrementAnonDoc()
+    }
+
     onStartReading(trimmed, {
       source:   uploadedFileName ? uploadedFileName.split('.').pop().toLowerCase() : 'paste',
       fileName: uploadedFileName ?? null,
@@ -113,7 +136,7 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
   }
 
   function handleAssignmentsParsed(parsed) {
-    saveAssignments(parsed)
+    saveAssignments(parsed) // async, fire-and-forget
     setAssignments(parsed)
   }
 
@@ -122,8 +145,8 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
     setAssignments(updated)
   }
 
-  function handleReParse() {
-    clearAssignments()
+  async function handleReParse() {
+    await clearAssignments()
     setAssignments([])
   }
 
@@ -163,7 +186,9 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
             >
               ← Dashboard
             </button>
-            {/* Sprint 8: Settings gear */}
+            {/* Sprint 9: User account button — only rendered when Clerk is configured */}
+            {CLERK_ENABLED && <UserButton afterSignOutUrl="/" />}
+            {/* Settings gear */}
             <button
               onClick={() => setShowSettings(true)}
               aria-label="Settings"
@@ -177,9 +202,12 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
                   fill="currentColor"/>
               </svg>
             </button>
-            <span className="text-xs text-ink-400 font-mono">v1.0 · Sprint 8</span>
+            <span className="text-xs text-ink-400 font-mono">v1.0 · Sprint 9</span>
           </div>
           {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+          {showAuthGate && CLERK_ENABLED && (
+            <AuthGate onClose={() => setShowAuthGate(false)} />
+          )}
         </div>
       </header>
 
