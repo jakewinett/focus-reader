@@ -4,34 +4,38 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['DM Sans', 'sans-serif'],
-        mono: ['DM Mono', 'monospace'],
+        sans:  ['DM Sans', 'sans-serif'],
+        mono:  ['DM Mono', 'monospace'],
+        brand: ['Quicksand', 'sans-serif'],    // wordmark / display
       },
       colors: {
+        // Slate Ink — brand neutral, replaces warm gray
         ink: {
-          50:  '#f5f4f2',
-          100: '#e8e6e1',
-          200: '#d1cec6',
-          300: '#b3afa4',
-          400: '#8e8a7e',
-          500: '#6e6a5f',
-          600: '#55524a',
-          700: '#3e3c36',
-          800: '#28261f',
-          900: '#161510',
+          50:  '#f4f6fa',
+          100: '#e6ebf3',
+          200: '#cdd7e6',
+          300: '#adb9ce',
+          400: '#8698b3',
+          500: '#637895',
+          600: '#4d6179',
+          700: '#3a4d5f',
+          800: '#283a50',
+          900: '#1F2E45',   // brand Slate Ink
         },
+        // Calm Teal → Focus Blue — brand primary accent
         focus: {
-          50:  '#eef6ff',
-          100: '#daeaff',
-          200: '#bed9ff',
-          300: '#91c0ff',
-          400: '#609cff',
-          500: '#3b77fc',
-          600: '#2256f1',
-          700: '#1a42de',
-          800: '#1c37b4',
-          900: '#1c328e',
+          50:  '#f0faf9',
+          100: '#ccefee',
+          200: '#99dedc',
+          300: '#5cc8c5',
+          400: '#25aeab',
+          500: '#0E8C8C',   // brand Calm Teal
+          600: '#0c7272',   // primary buttons
+          700: '#0a5d5d',   // hover
+          800: '#084848',
+          900: '#053232',
         },
+        // Sage — retained for success/calibration states
         sage: {
           50:  '#f2f7f4',
           100: '#e0ede6',

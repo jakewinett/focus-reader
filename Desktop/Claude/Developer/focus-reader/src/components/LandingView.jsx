@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { UserButton } from '@clerk/clerk-react'
+import EvanoryLogo from './EvanoryLogo.jsx'
 import { extractFromPDF, extractFromDOCX } from '../utils/fileUtils.js'
 import { loadAssignments, saveAssignments, clearAssignments,
          loadCourses, saveCourses } from '../storage/state.js'
@@ -25,7 +26,7 @@ const CLERK_ENABLED = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
 const PLACEHOLDER = `Paste your reading here — an article, textbook chapter, PDF text, or anything you need to get through.
 
-Focus Reader will highlight one line at a time so you can move through it without losing your place. When you're done, you'll get a short quiz to check what you retained.
+Evanory will highlight one line at a time so you can move through it without losing your place. When you're done, you'll get a short quiz to check what you retained.
 
 Paste anything above this line and hit Start Reading.`
 
@@ -169,16 +170,7 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
       {/* Header */}
       <header className="border-b border-ink-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-focus-600 flex items-center justify-center">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="3" width="12" height="1.5" rx="0.75" fill="white"/>
-                <rect x="1" y="6.25" width="8" height="1.5" rx="0.75" fill="white"/>
-                <rect x="1" y="9.5" width="10" height="1.5" rx="0.75" fill="white"/>
-              </svg>
-            </div>
-            <span className="font-semibold text-ink-800 tracking-tight">Focus Reader</span>
-          </div>
+          <EvanoryLogo />
           <div className="flex items-center gap-3">
             <button
               onClick={onBack}

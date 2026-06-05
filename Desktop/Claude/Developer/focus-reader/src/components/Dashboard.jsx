@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { UserButton } from '@clerk/clerk-react'
 import { loadAssignments, saveAssignments, clearAssignments, loadCourses } from '../storage/state.js'
+import EvanoryLogo from './EvanoryLogo.jsx'
 import SettingsModal from './SettingsModal.jsx'
 import HistoryZone from './HistoryZone.jsx'
 
@@ -280,16 +281,7 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
       {/* Header */}
       <header className="border-b border-ink-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-focus-600 flex items-center justify-center">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="3" width="12" height="1.5" rx="0.75" fill="white"/>
-                <rect x="1" y="6.25" width="8" height="1.5" rx="0.75" fill="white"/>
-                <rect x="1" y="9.5" width="10" height="1.5" rx="0.75" fill="white"/>
-              </svg>
-            </div>
-            <span className="font-semibold text-ink-800 tracking-tight">Focus Reader</span>
-          </div>
+          <EvanoryLogo />
           <div className="flex items-center gap-3">
             <span className="text-xs text-ink-400 font-mono hidden sm:inline">v1.0 · Sprint 10</span>
             {/* Sprint 9: User account button — only rendered when Clerk is configured */}
