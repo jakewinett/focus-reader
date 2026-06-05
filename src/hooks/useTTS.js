@@ -31,6 +31,32 @@ export const TTS_AVAILABLE = typeof window !== 'undefined' && 'speechSynthesis' 
 // Pre-warm voices as early as possible so they're ready when the user clicks.
 if (TTS_AVAILABLE) window.speechSynthesis.getVoices()
 
+// Retry wrapper: Chrome sometimes fires 'canceled' spuriously on the first
+// speak() call even when the queue was empty. Retry once with a short delay.
+function speakWithRetry(utter, attempt = 0) {
+  if (!TTS_AVAILABLE) return
+  const originalError = utter.onerror
+  if (attempt === 0) {
+    utter.onerror = e => {
+      if (e.error === 'canceled' && attempt === 0) {
+        // Re-create utterance (used utterances can't be re-spoken)
+        const retry = new SpeechSynthesisUtterance(utter.text)
+        retry.rate   = utter.rate
+        retry.lang   = utter.lang
+        retry.volume = utter.volume
+        if (utter.voice) retry.voice = utter.voice
+        retry.onstart = utter.onstart
+        retry.onend   = utter.onend
+        retry.onerror = originalError  // use original handler for retry
+        setTimeout(() => window.speechSynthesis.speak(retry), 100)
+        return
+      }
+      originalError?.(e)
+    }
+  }
+  window.speechSynthesis.speak(utter)
+}
+
 export function useTTS({ lines, currentIndex, onAdvance, isComplete }) {
   const [isEnabled,  setIsEnabled]  = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -87,10 +113,13 @@ export function useTTS({ lines, currentIndex, onAdvance, isComplete }) {
       utterRef.current = null
     }
 
-    // Stop whatever is playing, then start the new utterance
-    window.speechSynthesis.cancel()
+    // Only cancel if something is already speaking/queued — avoids the Chrome
+    // bug where cancel() on an empty queue triggers 'canceled' on the next speak()
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      window.speechSynthesis.cancel()
+    }
     utterRef.current = utter
-    window.speechSynthesis.speak(utter)
+    speakWithRetry(utter)
   }
 
   // When the line advances while TTS is on, speak the new line
