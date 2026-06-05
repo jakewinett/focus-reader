@@ -110,9 +110,11 @@ export function useTTS({ lines, currentIndex, onAdvance, isComplete }) {
       ss.resume()
       setIsSpeaking(true)
       setIsPaused(false)
+    } else {
+      // Not speaking, not paused — manually start current line.
+      // Also covers the case where the initial auto-speak silently failed.
+      speakLine(lines[currentIndex], rate)
     }
-    // No else: if neither speaking nor paused, speech will resume automatically
-    // on the next line advance — no manual restart needed.
   }
 
   function setRate(newRate) {
