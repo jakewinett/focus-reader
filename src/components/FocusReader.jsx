@@ -260,7 +260,7 @@ export default function FocusReader({
   }, [readMode, isComplete, paragraphs, lines])
 
   // ── TTS ──────────────────────────────────────────────────────────
-  const { isEnabled: ttsEnabled, toggle: toggleTTS, isSpeaking,
+  const { isEnabled: ttsEnabled, toggle: toggleTTS, isSpeaking, isPaused: ttsPaused,
           togglePause, rate: ttsRate, setRate: setTTSRate, stop: stopTTS } = useTTS({
     lines, currentIndex, onAdvance: advance, isComplete,
   })
@@ -393,8 +393,10 @@ export default function FocusReader({
                 </svg>
               </button>
 
-              {/* Pause/resume — only when TTS is on */}
-              {ttsEnabled && (
+              {/* Pause/resume — only while actively speaking or explicitly paused.
+                  Hidden between lines so users can't click it right after enabling
+                  TTS and accidentally interfere with the queued utterance. */}
+              {ttsEnabled && (isSpeaking || ttsPaused) && (
                 <button
                   onClick={togglePause}
                   aria-label={isSpeaking ? 'Pause' : 'Resume'}
