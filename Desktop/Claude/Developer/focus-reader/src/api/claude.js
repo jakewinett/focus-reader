@@ -67,13 +67,16 @@ async function callClaude({ max_tokens, messages, requestType = 'analyze' }) {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     const err  = new Error(body?.error ?? `Claude API error ${res.status}`)
-    err.code   = body?.error === 'rate_limit' ? 'RATE_LIMIT' : 'API_ERROR'
-    err.status = res.status
+    err.code      = body?.error === 'rate_limit' ? 'RATE_LIMIT' : 'API_ERROR'
+    err.status    = res.status
     err.remaining = body?.remaining ?? null
     throw err
   }
 
-  return res.json()
+  const data      = await res.json()
+  const remaining = res.headers.get('x-ai-remaining')
+  data._aiRemaining = remaining !== null ? parseInt(remaining, 10) : null
+  return data
 }
 
 // ── JSON extraction helper ────────────────────────────────────────────────────
@@ -108,8 +111,8 @@ ${numbered}`
   try {
     const data   = await callClaude({ max_tokens: 512, messages: [{ role: 'user', content: prompt }], requestType: 'analyze' })
     const parsed = JSON.parse(extractJSON(data.content?.[0]?.text ?? ''))
-    return Array.isArray(parsed) ? parsed : []
-  } catch { return [] }
+    return { sections: Array.isArray(parsed) ? parsed : [], aiRemaining: data._aiRemaining ?? null }
+  } catch { return { sections: [], aiRemaining: null } }
 }
 
 export async function generateQuiz(lines) {
@@ -134,8 +137,11 @@ ${numbered}`
   try {
     const data   = await callClaude({ max_tokens: 1024, messages: [{ role: 'user', content: prompt }], requestType: 'quiz' })
     const parsed = JSON.parse(extractJSON(data.content?.[0]?.text ?? ''))
-    return Array.isArray(parsed) && parsed.length ? parsed : null
-  } catch { return null }
+    return {
+      questions:    Array.isArray(parsed) && parsed.length ? parsed : null,
+      aiRemaining:  data._aiRemaining ?? null,
+    }
+  } catch { return { questions: null, aiRemaining: null } }
 }
 
 export async function parseSyllabus(text) {

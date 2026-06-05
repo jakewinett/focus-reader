@@ -1,20 +1,28 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { parseLines, parseParagraphs, countWords, countTotalWords, formatMinutes, isBlankLine } from '../utils/textUtils.js'
+import { parseLines, parseParagraphs, countWords, countTotalWords, formatMinutes, isBlankLine, bionicize } from '../utils/textUtils.js'
 import { getBlockLabel } from '../utils/fileUtils.js'
 import { useReadingPace, useFontSize } from '../hooks/useReadingPace.js'
+import { useTTS, TTS_AVAILABLE } from '../hooks/useTTS.js'
+import { useDisplayPrefs } from '../hooks/useDisplayPrefs.js'
 import { analyzeText, generateQuiz } from '../api/claude.js'
+import RateLimitBanner from './RateLimitBanner.jsx'
 import Quiz from './Quiz.jsx'
 
+const DAILY_LIMIT = Number(import.meta.env.VITE_DAILY_AI_LIMIT ?? 25)
+
 // ── Block card ───────────────────────────────────────────────────────────────
-// Renders a § block entry (TOC, list, table rows) as a self-contained card.
-// All items are visible at once; one "Next" press advances past the whole block.
-function BlockCard({ line, isActive, isRead, activeRef, onClick, fontSize }) {
-  const content  = line.slice(1)           // strip leading §
+function BlockCard({ line, isActive, isRead, activeRef, onClick, fontSize, lineSpacing, dyslexiaFont, bionicMode }) {
+  const content  = line.slice(1)
   const items    = content.split('\n')
-  const label    = getBlockLabel(items[0]) // recognise "Table of Contents" etc.
-  // If first item is a recognised label, show it as a header; otherwise show all items equally
+  const label    = getBlockLabel(items[0])
   const header   = label ? items[0] : null
   const entries  = label ? items.slice(1) : items
+
+  const textStyle = {
+    fontSize: `${Math.max(fontSize - 1, 13)}px`,
+    lineHeight: lineSpacing,
+    fontFamily: dyslexiaFont ? '"OpenDyslexic", sans-serif' : undefined,
+  }
 
   return (
     <div
@@ -23,24 +31,20 @@ function BlockCard({ line, isActive, isRead, activeRef, onClick, fontSize }) {
       className={[
         'my-3 rounded-2xl border overflow-hidden cursor-pointer select-none',
         'transition-all duration-200',
-        isActive
-          ? 'border-focus-300 shadow-sm'
-          : isRead
-          ? 'border-ink-100 opacity-40'
-          : 'border-ink-100 opacity-20',
+        isActive  ? 'border-focus-300 shadow-sm'
+        : isRead  ? 'border-ink-100 opacity-40'
+                  : 'border-ink-100 opacity-20',
       ].join(' ')}
     >
-      {/* Card header */}
       <div className={[
         'px-4 py-2 flex items-center gap-2 border-b',
         isActive ? 'bg-focus-50 border-focus-100' : 'bg-ink-50 border-ink-100',
       ].join(' ')}>
-        {/* Stacked-lines icon */}
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"
              className={isActive ? 'text-focus-500' : 'text-ink-400'}>
-          <rect x="1" y="2" width="11" height="1.5" rx="0.75" fill="currentColor"/>
-          <rect x="1" y="5.75" width="8" height="1.5" rx="0.75" fill="currentColor"/>
-          <rect x="1" y="9.5" width="9.5" height="1.5" rx="0.75" fill="currentColor"/>
+          <rect x="1" y="2"   width="11" height="1.5" rx="0.75" fill="currentColor"/>
+          <rect x="1" y="5.75" width="8"  height="1.5" rx="0.75" fill="currentColor"/>
+          <rect x="1" y="9.5"  width="9.5" height="1.5" rx="0.75" fill="currentColor"/>
         </svg>
         <span className={[
           'text-xs font-mono uppercase tracking-wider',
@@ -49,23 +53,16 @@ function BlockCard({ line, isActive, isRead, activeRef, onClick, fontSize }) {
           {label ?? 'List'}
         </span>
       </div>
-
-      {/* Entries */}
-      <div className={[
-        'px-4 py-3 space-y-1',
-        isActive ? 'bg-focus-50/30' : 'bg-white',
-      ].join(' ')}>
+      <div className={['px-4 py-3 space-y-1', isActive ? 'bg-focus-50/30' : 'bg-white'].join(' ')}>
         {header && (
-          <p style={{ fontSize: `${fontSize}px` }}
+          <p style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing, fontFamily: dyslexiaFont ? '"OpenDyslexic", sans-serif' : undefined }}
              className="font-semibold text-ink-700 leading-snug pb-1.5 border-b border-ink-100 mb-2">
-            {header}
+            {bionicMode ? bionicize(header) : header}
           </p>
         )}
         {entries.map((entry, ei) => (
-          <p key={ei}
-             style={{ fontSize: `${Math.max(fontSize - 1, 13)}px` }}
-             className="text-ink-500 leading-snug">
-            {entry}
+          <p key={ei} style={textStyle} className="text-ink-500 leading-snug">
+            {bionicMode ? bionicize(entry) : entry}
           </p>
         ))}
       </div>
@@ -73,66 +70,118 @@ function BlockCard({ line, isActive, isRead, activeRef, onClick, fontSize }) {
   )
 }
 
+// ── Focus modes popover ──────────────────────────────────────────────────────
+function FocusModeRow({ label, active, onToggle }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs text-ink-600">{label}</span>
+      <button
+        onClick={onToggle}
+        aria-pressed={active}
+        className={[
+          'w-8 h-4 rounded-full transition-colors duration-200 relative shrink-0',
+          active ? 'bg-focus-500' : 'bg-ink-200',
+        ].join(' ')}
+      >
+        <span className={[
+          'absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform duration-200',
+          active ? 'translate-x-4' : 'translate-x-0.5',
+        ].join(' ')} />
+      </button>
+    </div>
+  )
+}
+
+function SpacingRow({ spacing, onCycle }) {
+  const labels = { 1.8: 'Normal', 2.2: 'Relaxed', 2.8: 'Loose' }
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs text-ink-600">Line spacing</span>
+      <button
+        onClick={onCycle}
+        className="text-xs font-mono text-focus-600 bg-focus-50 hover:bg-focus-100
+                   px-2 py-0.5 rounded-lg transition-colors"
+      >
+        {labels[spacing] ?? spacing}
+      </button>
+    </div>
+  )
+}
+
 // Sprint 1: line-by-line navigation, progress bar, pace calibration, font size control.
 // Sprint 3: section chunking + previews (AI call).
-// Sprint 4 adds: quiz trigger on completion.
+// Sprint 4: quiz trigger on completion.
 // Sprint 8: sessionId + initialLine for history resume; debounced auto-save; exit payload.
+// Sprint 9: auth token for Edge Function; rate limit banner.
+// Sprint 10: TTS, bionic reading, dyslexia font, line spacing.
 
 export default function FocusReader({
   rawText,
   onExit,
-  sessionId    = null,   // Sprint 8: history session id
-  initialLine  = 0,      // Sprint 8: resume position
-  onSavePosition = null, // Sprint 8: ({ id, lastLine, isComplete }) => Promise<void>
+  sessionId    = null,
+  initialLine  = 0,
+  onSavePosition = null,
 }) {
   const lines      = parseLines(rawText)
   const totalLines = lines.length
   const totalWords = countTotalWords(lines)
 
-  const [readMode, setReadMode]         = useState('line')  // 'line' | 'paragraph'
+  const [readMode, setReadMode]         = useState('line')
   const [currentIndex, setCurrentIndex] = useState(initialLine ?? 0)
   const [currentParaIndex, setCurrentParaIndex] = useState(0)
   const [isComplete, setIsComplete]     = useState(false)
+  const [aiRemaining, setAiRemaining]   = useState(null)
 
-  // Paragraph groupings derived from lines
   const paragraphs = useMemo(() => parseParagraphs(lines), [lines]) // eslint-disable-line react-hooks/exhaustive-deps
-  const [sections, setSections]               = useState([])    // [{title, startLine}]
+  const [sections, setSections]               = useState([])
   const [sectionsLoading, setSectionsLoading] = useState(false)
-  const [quizQuestions, setQuizQuestions]     = useState(null)  // null | QuizQuestion[]
+  const [quizQuestions, setQuizQuestions]     = useState(null)
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false)
+
+  // Focus modes popover
+  const [showFocusModes, setShowFocusModes] = useState(false)
+  const focusModeRef = useRef(null)
 
   const { estimatedMinutes, isCalibrated, recordProgress } = useReadingPace(totalWords)
   const { fontSize, increase, decrease }   = useFontSize()
+  const { bionicMode, toggleBionic, dyslexiaFont, toggleDyslexia,
+          lineSpacing, cycleSpacing, anyActive: anyFocusActive } = useDisplayPrefs()
 
   const containerRef  = useRef(null)
   const activeLineRef = useRef(null)
 
-  // Progress: count only non-blank lines so blank separators don't dilute the percentage
+  // Progress (non-blank lines only)
   const nonBlankTotal  = lines.filter(l => l !== '').length
   const nonBlankPassed = lines.slice(0, currentIndex + 1).filter(l => l !== '').length
   const progress = nonBlankTotal > 0 ? Math.round((nonBlankPassed / nonBlankTotal) * 100) : 0
 
-  // ── Section analysis (Sprint 3) ──────────────────────────────
+  // ── Section analysis ─────────────────────────────────────────────
   useEffect(() => {
     if (lines.length === 0) return
     setSectionsLoading(true)
     analyzeText(lines)
-      .then(result => setSections(Array.isArray(result) ? result : []))
+      .then(result => {
+        setSections(Array.isArray(result.sections) ? result.sections : [])
+        if (result.aiRemaining != null) setAiRemaining(result.aiRemaining)
+      })
       .catch(() => setSections([]))
       .finally(() => setSectionsLoading(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Quiz generation (Sprint 4) ───────────────────────────────
+  // ── Quiz generation ──────────────────────────────────────────────
   useEffect(() => {
     if (!isComplete) return
     setIsGeneratingQuiz(true)
     generateQuiz(lines)
-      .then(qs => setQuizQuestions(Array.isArray(qs) && qs.length ? qs : null))
+      .then(result => {
+        setQuizQuestions(result.questions ?? null)
+        if (result.aiRemaining != null) setAiRemaining(result.aiRemaining)
+      })
       .catch(() => setQuizQuestions(null))
       .finally(() => setIsGeneratingQuiz(false))
   }, [isComplete]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Sprint 8: Debounced position auto-save ───────────────────
+  // ── Sprint 8: Debounced position auto-save ───────────────────────
   const saveTimerRef = useRef(null)
   useEffect(() => {
     if (!onSavePosition || !sessionId) return
@@ -143,23 +192,30 @@ export default function FocusReader({
     return () => clearTimeout(saveTimerRef.current)
   }, [currentIndex, isComplete, sessionId, onSavePosition])
 
-  // Immediate save when reading is completed
   useEffect(() => {
-    if (isComplete && onSavePosition && sessionId) {
+    if (isComplete && onSavePosition && sessionId)
       onSavePosition({ id: sessionId, lastLine: currentIndex, isComplete: true })
-    }
   }, [isComplete]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Which section is the reader currently in?
+  // ── Close focus modes popover on outside click ───────────────────
+  useEffect(() => {
+    if (!showFocusModes) return
+    function handleClick(e) {
+      if (focusModeRef.current && !focusModeRef.current.contains(e.target)) {
+        setShowFocusModes(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showFocusModes])
+
+  // Section info
   const currentSectionIdx = sections.reduce((acc, s, i) =>
     currentIndex >= s.startLine ? i : acc, -1)
-
-  // Show "Up next" chip when within 5 lines of the next section boundary
   const nextSection = sections[currentSectionIdx + 1] ?? null
-  const upNext = nextSection && (nextSection.startLine - currentIndex) <= 5
-    ? nextSection : null
+  const upNext = nextSection && (nextSection.startLine - currentIndex) <= 5 ? nextSection : null
 
-  // ── Navigation ───────────────────────────────────────────────
+  // ── Navigation ───────────────────────────────────────────────────
   const advance = useCallback(() => {
     if (readMode === 'paragraph') {
       setCurrentParaIndex(prev => {
@@ -175,7 +231,6 @@ export default function FocusReader({
       })
     } else {
       setCurrentIndex(prev => {
-        // Skip past any blank separator lines to the next content line
         let next = prev + 1
         while (next < totalLines && lines[next] === '') next++
         if (next >= totalLines) { setIsComplete(true); return prev }
@@ -196,7 +251,6 @@ export default function FocusReader({
     } else {
       setCurrentIndex(prev => {
         if (prev <= 0) return 0
-        // Skip past any blank separator lines to the previous content line
         let next = prev - 1
         while (next > 0 && lines[next] === '') next--
         return next
@@ -205,7 +259,13 @@ export default function FocusReader({
     if (isComplete) setIsComplete(false)
   }, [readMode, isComplete, paragraphs, lines])
 
-  // ── Keyboard handler ─────────────────────────────────────────
+  // ── TTS ──────────────────────────────────────────────────────────
+  const { isEnabled: ttsEnabled, toggle: toggleTTS, isSpeaking,
+          togglePause, rate: ttsRate, setRate: setTTSRate, stop: stopTTS } = useTTS({
+    lines, currentIndex, onAdvance: advance, isComplete,
+  })
+
+  // ── Keyboard handler ─────────────────────────────────────────────
   useEffect(() => {
     function handleKey(e) {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return
@@ -213,34 +273,31 @@ export default function FocusReader({
         case ' ':
         case 'ArrowDown':
         case 'ArrowRight':
-          e.preventDefault()
-          advance()
-          break
+          e.preventDefault(); advance(); break
         case 'ArrowUp':
         case 'ArrowLeft':
-          e.preventDefault()
-          retreat()
-          break
-        default:
-          break
+          e.preventDefault(); retreat(); break
+        default: break
       }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [advance, retreat])
 
-  // ── Auto-scroll active line into view ────────────────────────
+  // ── Auto-scroll ──────────────────────────────────────────────────
   useEffect(() => {
     activeLineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [currentIndex])
 
-  // ── Focus container on mount ─────────────────────────────────
-  useEffect(() => {
-    containerRef.current?.focus()
-  }, [])
+  useEffect(() => { containerRef.current?.focus() }, [])
 
   const wordsRead      = countTotalWords(lines.slice(0, currentIndex + 1))
   const wordsRemaining = Math.max(0, totalWords - wordsRead)
+
+  function handleExit() {
+    stopTTS()
+    onExit({ lastLine: currentIndex, isComplete })
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
@@ -251,7 +308,7 @@ export default function FocusReader({
 
           {/* Exit */}
           <button
-            onClick={() => onExit({ lastLine: currentIndex, isComplete })}
+            onClick={handleExit}
             className="flex items-center gap-1.5 text-ink-400 hover:text-ink-700
                        text-sm transition-colors duration-150 shrink-0"
             aria-label="Exit reader"
@@ -285,8 +342,7 @@ export default function FocusReader({
           <div className="shrink-0 text-xs text-ink-400 flex items-center gap-1.5">
             {isCalibrated ? (
               <>
-                <span className="w-1.5 h-1.5 rounded-full bg-sage-400 inline-block"
-                      title="Calibrated to your reading pace" />
+                <span className="w-1.5 h-1.5 rounded-full bg-sage-400 inline-block" title="Calibrated to your reading pace" />
                 <span>{formatMinutes(estimatedMinutes)} left</span>
               </>
             ) : (
@@ -297,6 +353,9 @@ export default function FocusReader({
             )}
           </div>
 
+          {/* Rate limit banner (Sprint 9 — shown for operator-key users) */}
+          <RateLimitBanner remaining={aiRemaining} limit={DAILY_LIMIT} />
+
           {/* Up next chip */}
           {upNext && (
             <div className="shrink-0 hidden sm:flex items-center gap-1.5 text-xs
@@ -306,22 +365,118 @@ export default function FocusReader({
             </div>
           )}
 
+          {/* ── TTS controls ── */}
+          {TTS_AVAILABLE && (
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Speaker toggle */}
+              <button
+                onClick={toggleTTS}
+                aria-pressed={ttsEnabled}
+                aria-label={ttsEnabled ? 'Disable text to speech' : 'Enable text to speech'}
+                title="Text to speech"
+                className={[
+                  'w-7 h-7 flex items-center justify-center rounded-lg transition-colors duration-150',
+                  ttsEnabled ? 'text-focus-600 bg-focus-50' : 'text-ink-400 hover:text-ink-700 hover:bg-ink-100',
+                ].join(' ')}
+              >
+                {/* Speaker icon */}
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                  <path d="M2 5.5h2.5l3.5-3v10L4.5 9.5H2a.5.5 0 0 1-.5-.5v-3A.5.5 0 0 1 2 5.5Z"
+                        stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                  {ttsEnabled ? (
+                    <path d="M10.5 5a3 3 0 0 1 0 5M12 3.5a5.5 5.5 0 0 1 0 8"
+                          stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  ) : (
+                    <path d="M10.5 5.5l3 4M13.5 5.5l-3 4"
+                          stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  )}
+                </svg>
+              </button>
+
+              {/* Pause/resume — only when TTS is on */}
+              {ttsEnabled && (
+                <button
+                  onClick={togglePause}
+                  aria-label={isSpeaking ? 'Pause' : 'Resume'}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg
+                             text-focus-600 bg-focus-50 hover:bg-focus-100 transition-colors duration-150"
+                >
+                  {isSpeaking ? (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <rect x="2" y="1.5" width="3" height="9" rx="1" fill="currentColor"/>
+                      <rect x="7" y="1.5" width="3" height="9" rx="1" fill="currentColor"/>
+                    </svg>
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2.5 1.5l8 4.5-8 4.5V1.5Z" fill="currentColor"/>
+                    </svg>
+                  )}
+                </button>
+              )}
+
+              {/* Speed selector — only when TTS is on */}
+              {ttsEnabled && (
+                <select
+                  value={ttsRate}
+                  onChange={e => setTTSRate(Number(e.target.value))}
+                  aria-label="Playback speed"
+                  className="text-xs font-mono text-focus-600 bg-focus-50 hover:bg-focus-100
+                             border-none outline-none rounded-lg px-1.5 py-1 cursor-pointer
+                             transition-colors duration-150"
+                >
+                  {[0.75, 1, 1.25, 1.5, 2].map(r => (
+                    <option key={r} value={r}>{r}×</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {/* ── Focus modes popover ── */}
+          <div className="relative shrink-0" ref={focusModeRef}>
+            <button
+              onClick={() => setShowFocusModes(v => !v)}
+              aria-label="Focus modes"
+              title="Focus modes"
+              className={[
+                'w-7 h-7 flex items-center justify-center rounded-lg transition-colors duration-150 relative',
+                anyFocusActive ? 'text-focus-600 bg-focus-50' : 'text-ink-400 hover:text-ink-700 hover:bg-ink-100',
+              ].join(' ')}
+            >
+              {/* Wand / sparkle icon */}
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <path d="M2 13L9 6M9 6l1-3 3-1-1 3-3 1ZM9 6l-1-1" stroke="currentColor"
+                      strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="12" cy="3" r="0.75" fill="currentColor"/>
+              </svg>
+              {anyFocusActive && (
+                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-focus-500" />
+              )}
+            </button>
+
+            {showFocusModes && (
+              <div className="absolute right-0 top-9 z-20 bg-white rounded-xl shadow-lg
+                              border border-ink-100 p-3 w-44 space-y-3 animate-fade-in">
+                <p className="text-xs font-semibold text-ink-400 uppercase tracking-wide">Focus modes</p>
+                <FocusModeRow label="Bionic reading" active={bionicMode}   onToggle={toggleBionic} />
+                <FocusModeRow label="Dyslexia font"  active={dyslexiaFont} onToggle={toggleDyslexia} />
+                <SpacingRow   spacing={lineSpacing}  onCycle={cycleSpacing} />
+              </div>
+            )}
+          </div>
+
           {/* Font size controls */}
           <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={decrease}
+            <button onClick={decrease}
               className="w-7 h-7 flex items-center justify-center rounded-lg
                          text-ink-400 hover:text-ink-700 hover:bg-ink-100
                          transition-colors duration-150 text-sm font-medium"
-              aria-label="Decrease font size"
-            >A−</button>
-            <button
-              onClick={increase}
+              aria-label="Decrease font size">A−</button>
+            <button onClick={increase}
               className="w-7 h-7 flex items-center justify-center rounded-lg
                          text-ink-400 hover:text-ink-700 hover:bg-ink-100
                          transition-colors duration-150 text-sm font-medium"
-              aria-label="Increase font size"
-            >A+</button>
+              aria-label="Increase font size">A+</button>
           </div>
 
         </div>
@@ -336,7 +491,6 @@ export default function FocusReader({
       >
         {/* Context bar */}
         <div className="mb-6 flex items-center justify-between">
-          {/* Position counter */}
           <span className="text-xs text-ink-300 font-mono">
             {readMode === 'paragraph'
               ? `Para ${currentParaIndex + 1} of ${paragraphs.length}`
@@ -353,30 +507,16 @@ export default function FocusReader({
             <div className="flex items-center bg-ink-100 rounded-lg p-0.5 gap-0.5">
               <button
                 onClick={() => setReadMode('line')}
-                className={[
-                  'px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150',
-                  readMode === 'line'
-                    ? 'bg-white text-ink-800 shadow-sm'
-                    : 'text-ink-400 hover:text-ink-600',
+                className={['px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150',
+                  readMode === 'line' ? 'bg-white text-ink-800 shadow-sm' : 'text-ink-400 hover:text-ink-600',
                 ].join(' ')}
-                aria-pressed={readMode === 'line'}
-                title="Navigate line by line"
-              >
-                ≡ Line
-              </button>
+                aria-pressed={readMode === 'line'} title="Navigate line by line">≡ Line</button>
               <button
                 onClick={() => setReadMode('paragraph')}
-                className={[
-                  'px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150',
-                  readMode === 'paragraph'
-                    ? 'bg-white text-ink-800 shadow-sm'
-                    : 'text-ink-400 hover:text-ink-600',
+                className={['px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150',
+                  readMode === 'paragraph' ? 'bg-white text-ink-800 shadow-sm' : 'text-ink-400 hover:text-ink-600',
                 ].join(' ')}
-                aria-pressed={readMode === 'paragraph'}
-                title="Navigate paragraph by paragraph"
-              >
-                ¶ Para
-              </button>
+                aria-pressed={readMode === 'paragraph'} title="Navigate paragraph by paragraph">¶ Para</button>
             </div>
           </div>
         </div>
@@ -392,9 +532,9 @@ export default function FocusReader({
               ? (activePara && index < activePara.startLine)
               : index < currentIndex
             const isBlank    = isBlankLine(line)
-            const isBlock    = line.startsWith('\u00A7')
-            const sectionAtLine   = sections.find(s => s.startLine === index)
-            const isSectionStart  = !!sectionAtLine && index > 0
+            const isBlock    = line.startsWith('§')
+            const sectionAtLine  = sections.find(s => s.startLine === index)
+            const isSectionStart = !!sectionAtLine && index > 0
 
             const handleClick = () => {
               setCurrentIndex(index)
@@ -403,7 +543,6 @@ export default function FocusReader({
 
             return (
               <div key={index}>
-                {/* Section divider \u2014 appears above the first line of each section (skip line 0) */}
                 {isSectionStart && (
                   <div className="flex items-center gap-3 py-3 mt-2 mb-1 select-none">
                     <div className="flex-1 h-px bg-ink-100" />
@@ -414,7 +553,6 @@ export default function FocusReader({
                   </div>
                 )}
 
-                {/* Block card (TOC, list, table) */}
                 {isBlock ? (
                   <BlockCard
                     line={line}
@@ -423,25 +561,31 @@ export default function FocusReader({
                     activeRef={isActive ? activeLineRef : null}
                     onClick={handleClick}
                     fontSize={fontSize}
+                    lineSpacing={lineSpacing}
+                    dyslexiaFont={dyslexiaFont}
+                    bionicMode={bionicMode}
                   />
                 ) : (
-                  /* Regular / blank line */
                   <div
                     ref={isActive ? activeLineRef : null}
                     onClick={handleClick}
                     className={[
                       'reading-line',
                       isBlank ? 'py-2' : '',
-                      isActive
-                        ? 'line-active'
-                        : isRead
-                        ? 'line-read'
-                        : 'line-inactive',
+                      isActive ? 'line-active' : isRead ? 'line-read' : 'line-inactive',
                     ].join(' ')}
-                    style={{ fontSize: `${fontSize}px`, lineHeight: '1.8' }}
+                    style={{
+                      fontSize:   `${fontSize}px`,
+                      lineHeight: lineSpacing,
+                      fontFamily: dyslexiaFont ? '"OpenDyslexic", sans-serif' : undefined,
+                    }}
                     aria-current={isActive ? 'true' : undefined}
                   >
-                    {isBlank ? '\u00A0' : line}
+                    {isBlank
+                      ? ' '
+                      : bionicMode
+                        ? bionicize(line)
+                        : line}
                   </div>
                 )}
               </div>
@@ -449,14 +593,14 @@ export default function FocusReader({
           })}
         </div>
 
-        {/* Completion state — Quiz (Sprint 4) */}
+        {/* Completion state — Quiz */}
         {isComplete && (
           <div className="mt-12 animate-slide-up">
             <Quiz
               lines={lines}
               questions={quizQuestions}
               isLoading={isGeneratingQuiz}
-              onExit={() => onExit({ lastLine: currentIndex, isComplete: true })}
+              onExit={() => { stopTTS(); onExit({ lastLine: currentIndex, isComplete: true }) }}
             />
           </div>
         )}
@@ -466,7 +610,6 @@ export default function FocusReader({
       <footer className="sticky bottom-0 bg-white/95 backdrop-blur-sm border-t border-ink-100">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
 
-          {/* Back button */}
           <button
             onClick={retreat}
             disabled={currentIndex === 0}
@@ -483,7 +626,6 @@ export default function FocusReader({
             Back
           </button>
 
-          {/* Keyboard hint */}
           <div className="text-xs text-ink-300 font-mono hidden sm:flex items-center gap-2">
             <kbd className="px-1.5 py-0.5 bg-ink-100 rounded text-ink-400">space</kbd>
             <span>or</span>
@@ -491,15 +633,12 @@ export default function FocusReader({
             <span>{readMode === 'paragraph' ? 'next paragraph' : 'next line'}</span>
           </div>
 
-          {/* Next button */}
           <button
             onClick={advance}
             disabled={isComplete}
             className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium
-                       bg-focus-600 text-white
-                       hover:bg-focus-700 active:scale-95
-                       disabled:opacity-40 disabled:cursor-not-allowed
-                       disabled:active:scale-100
+                       bg-focus-600 text-white hover:bg-focus-700 active:scale-95
+                       disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100
                        transition-all duration-150"
             aria-label="Next line"
           >
