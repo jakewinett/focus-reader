@@ -202,7 +202,7 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
                   fill="currentColor"/>
               </svg>
             </button>
-            <span className="text-xs text-ink-400 font-mono">v1.0 · Sprint 9</span>
+            <span className="text-xs text-ink-400 font-mono">v1.0 · Sprint 10</span>
           </div>
           {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
           {showAuthGate && CLERK_ENABLED && (
