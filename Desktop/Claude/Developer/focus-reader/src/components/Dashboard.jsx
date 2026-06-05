@@ -291,7 +291,7 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
             <span className="font-semibold text-ink-800 tracking-tight">Focus Reader</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-ink-400 font-mono hidden sm:inline">v1.0 · Sprint 9</span>
+            <span className="text-xs text-ink-400 font-mono hidden sm:inline">v1.0 · Sprint 10</span>
             {/* Sprint 9: User account button — only rendered when Clerk is configured */}
             {CLERK_ENABLED && <UserButton afterSignOutUrl="/" />}
             {/* Settings gear */}
