@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { UserButton } from '@clerk/react'
+import { UserButton, SignInButton, SignUpButton } from '@clerk/react'
+import { useAppAuth } from '../lib/AuthContext.jsx'
 import { loadAssignments, saveAssignments, clearAssignments, loadCourses } from '../storage/state.js'
 import EvanoryLogo from './EvanoryLogo.jsx'
 import SettingsModal from './SettingsModal.jsx'
@@ -204,6 +205,7 @@ function CourseCard({ name, done, total, pct, teacher, schedule }) {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export default function Dashboard({ onGoToLanding, onStartReading, onReParse, onContinueReading }) {
+  const { isSignedIn } = useAppAuth()
   const [assignments, setAssignments]   = useState([])
   const [courses, setCourses]           = useState([])
   const [showSettings, setShowSettings] = useState(false)
@@ -284,8 +286,23 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
           <EvanoryLogo />
           <div className="flex items-center gap-3">
             <span className="text-xs text-ink-400 font-mono hidden sm:inline">v1.0 · Sprint 10</span>
-            {/* Sprint 9: User account button — only rendered when Clerk is configured */}
-            {CLERK_ENABLED && <UserButton afterSignOutUrl="/" />}
+            {/* Auth controls */}
+            {CLERK_ENABLED && !isSignedIn && (
+              <div className="flex items-center gap-2">
+                <SignInButton mode="modal">
+                  <button className="text-xs text-ink-500 hover:text-ink-800 transition-colors">
+                    Sign in
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className="text-xs font-medium px-3 py-1.5 bg-focus-600 text-white
+                                     rounded-lg hover:bg-focus-700 transition-colors">
+                    Sign up free
+                  </button>
+                </SignUpButton>
+              </div>
+            )}
+            {CLERK_ENABLED && isSignedIn && <UserButton afterSignOutUrl="/" />}
             {/* Settings gear */}
             <button
               onClick={() => setShowSettings(true)}

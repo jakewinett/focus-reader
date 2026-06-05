@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { UserButton } from '@clerk/react'
+import { UserButton, SignInButton, SignUpButton } from '@clerk/react'
 import EvanoryLogo from './EvanoryLogo.jsx'
 import { extractFromPDF, extractFromDOCX } from '../utils/fileUtils.js'
 import { loadAssignments, saveAssignments, clearAssignments,
@@ -178,8 +178,23 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
             >
               ← Dashboard
             </button>
-            {/* Sprint 9: User account button — only rendered when Clerk is configured */}
-            {CLERK_ENABLED && <UserButton afterSignOutUrl="/" />}
+            {/* Auth controls — sign in/up when anonymous, avatar when signed in */}
+            {CLERK_ENABLED && !isSignedIn && (
+              <div className="flex items-center gap-2">
+                <SignInButton mode="modal">
+                  <button className="text-xs text-ink-500 hover:text-ink-800 transition-colors">
+                    Sign in
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className="text-xs font-medium px-3 py-1.5 bg-focus-600 text-white
+                                     rounded-lg hover:bg-focus-700 transition-colors">
+                    Sign up free
+                  </button>
+                </SignUpButton>
+              </div>
+            )}
+            {CLERK_ENABLED && isSignedIn && <UserButton afterSignOutUrl="/" />}
             {/* Settings gear */}
             <button
               onClick={() => setShowSettings(true)}
