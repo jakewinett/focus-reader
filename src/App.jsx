@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import LandingView from './components/LandingView.jsx'
 import FocusReader from './components/FocusReader.jsx'
 import Dashboard   from './components/Dashboard.jsx'
@@ -156,6 +157,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
+      <Analytics />
       {!isOnline && <OfflineBanner />}
 
       {showMigration && (
