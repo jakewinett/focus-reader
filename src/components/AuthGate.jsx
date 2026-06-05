@@ -2,7 +2,7 @@
 // Triggers Clerk's hosted sign-in / sign-up overlay.
 // Only ever rendered when VITE_CLERK_PUBLISHABLE_KEY is set (ClerkProvider is in the tree).
 
-import { useClerk } from '@clerk/clerk-react'
+import { useClerk } from '@clerk/react'
 
 const LIMIT = Number(import.meta.env.VITE_ANON_DOC_LIMIT ?? 3)
 

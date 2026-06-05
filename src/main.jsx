@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { ClerkProvider } from '@clerk/clerk-react'
+import { ClerkProvider } from '@clerk/react'
 import ClerkAuthBridge from './lib/ClerkAuthBridge.jsx'
 import App from './App.jsx'
 import './styles/index.css'
