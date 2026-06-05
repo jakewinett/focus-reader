@@ -107,3 +107,25 @@ export function parseParagraphs(lines) {
   if (start !== null) paragraphs.push({ startLine: start, endLine: lines.length - 1 })
   return paragraphs
 }
+
+// Bionic reading — bolds the first ceil(n/2) characters of each word.
+// Punctuation-only tokens pass through without bolding.
+// Returns an array of React elements (import React where this is used).
+import { createElement, Fragment } from 'react'
+
+export function bionicize(text) {
+  if (!text) return text
+  const words = text.split(' ')
+  return words.map((word, i) => {
+    const spacer = i < words.length - 1 ? ' ' : ''
+    // Skip empty tokens and punctuation-only tokens
+    if (!word || /^[^\w]+$/.test(word)) {
+      return createElement(Fragment, { key: i }, word + spacer)
+    }
+    const boldLen = Math.ceil(word.length / 2)
+    return createElement(Fragment, { key: i },
+      createElement('b', null, word.slice(0, boldLen)),
+      word.slice(boldLen) + spacer,
+    )
+  })
+}
