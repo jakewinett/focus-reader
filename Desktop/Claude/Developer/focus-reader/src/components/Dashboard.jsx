@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { UserButton } from '@clerk/clerk-react'
+import { UserButton } from '@clerk/react'
 import { loadAssignments, saveAssignments, clearAssignments, loadCourses } from '../storage/state.js'
 import EvanoryLogo from './EvanoryLogo.jsx'
 import SettingsModal from './SettingsModal.jsx'

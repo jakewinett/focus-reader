@@ -1,7 +1,7 @@
 // Bridges Clerk's useAuth() hook into AuthContext so all app code uses useAppAuth() uniformly.
 // Only mounted when VITE_CLERK_PUBLISHABLE_KEY is present (inside ClerkProvider).
 
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth } from '@clerk/react'
 import { AuthContext } from './AuthContext.jsx'
 
 export default function ClerkAuthBridge({ children }) {

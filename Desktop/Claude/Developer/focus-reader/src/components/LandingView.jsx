@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { UserButton } from '@clerk/clerk-react'
+import { UserButton } from '@clerk/react'
 import EvanoryLogo from './EvanoryLogo.jsx'
 import { extractFromPDF, extractFromDOCX } from '../utils/fileUtils.js'
 import { loadAssignments, saveAssignments, clearAssignments,
