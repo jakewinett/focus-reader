@@ -1,32 +1,33 @@
 // Focus Reader — Text-to-speech hook (Sprint 10)
 // Uses browser-native window.speechSynthesis — no API key, no backend.
-// When enabled, reads each line aloud and auto-advances on utterance end.
+//
+// Key design rule: only the first speak() call can safely come from a user-gesture
+// handler (Chrome 71+ requirement). Subsequent calls (on line advance) happen in
+// speechSynthesis.onend callbacks which browsers treat as legitimate event contexts.
+//
+// To avoid double-calling speak(): toggle() handles the initial utterance directly
+// (in user-gesture context). The useEffect only fires on currentIndex changes —
+// NOT on isEnabled changes — so it never races with toggle().
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 
 const PREFS_KEY = 'focusreader_preferences'
 
 function getTTSRate() {
-  try {
-    const prefs = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}')
-    return prefs.tts_rate ?? 1.0
-  } catch { return 1.0 }
+  try { return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}').tts_rate ?? 1.0 }
+  catch { return 1.0 }
 }
 
 function saveTTSRate(rate) {
   try {
-    const prefs = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}')
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ ...prefs, tts_rate: rate }))
+    const p = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}')
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ ...p, tts_rate: rate }))
   } catch {}
 }
 
-// Convert a raw line string to speakable text
 function lineToSpeech(line) {
   if (!line || line.trim() === '') return ''
-  // Block card: strip § prefix, join items with pauses
-  if (line.startsWith('§')) {
-    return line.slice(1).replace(/\n/g, '. ')
-  }
+  if (line.startsWith('§')) return line.slice(1).replace(/\n/g, '. ')
   return line
 }
 
@@ -37,19 +38,17 @@ export function useTTS({ lines, currentIndex, onAdvance, isComplete }) {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [rate,       setRateState]  = useState(() => getTTSRate())
 
-  // Refs to avoid stale closures inside SpeechSynthesisUtterance callbacks
+  // Refs — allow callbacks to read latest values without being in deps arrays
   const isEnabledRef  = useRef(false)
   const isCompleteRef = useRef(isComplete)
-  const utterRef      = useRef(null)
 
-  useEffect(() => { isEnabledRef.current = isEnabled },  [isEnabled])
+  // Keep refs in sync with state (synchronously in toggle/stop, and via effects)
   useEffect(() => { isCompleteRef.current = isComplete }, [isComplete])
 
   const cancelSpeech = useCallback(() => {
     if (!TTS_AVAILABLE) return
     window.speechSynthesis.cancel()
     setIsSpeaking(false)
-    utterRef.current = null
   }, [])
 
   const speakLine = useCallback((text, currentRate) => {
@@ -57,7 +56,7 @@ export function useTTS({ lines, currentIndex, onAdvance, isComplete }) {
 
     const speech = lineToSpeech(text)
 
-    // Skip blank / empty lines immediately
+    // Blank / empty line — skip immediately
     if (!speech.trim()) {
       if (isEnabledRef.current && !isCompleteRef.current) onAdvance()
       return
@@ -65,72 +64,72 @@ export function useTTS({ lines, currentIndex, onAdvance, isComplete }) {
 
     window.speechSynthesis.cancel()
 
-    const utter     = new SpeechSynthesisUtterance(speech)
-    utter.rate      = currentRate
-    utter.onstart   = () => setIsSpeaking(true)
-    utter.onend     = () => {
+    const utter   = new SpeechSynthesisUtterance(speech)
+    utter.rate    = currentRate
+    utter.onstart = () => setIsSpeaking(true)
+    utter.onend   = () => {
       setIsSpeaking(false)
-      utterRef.current = null
-      // Auto-advance only if TTS is still enabled and reading isn't complete
-      if (isEnabledRef.current && !isCompleteRef.current) {
-        onAdvance()
-      }
+      if (isEnabledRef.current && !isCompleteRef.current) onAdvance()
     }
-    utter.onerror   = (e) => {
-      // 'interrupted' fires when we cancel intentionally — suppress it
-      if (e.error === 'interrupted') return
+    utter.onerror = e => {
+      if (e.error === 'interrupted') return  // we cancelled intentionally — suppress
       setIsSpeaking(false)
-      utterRef.current = null
     }
 
-    utterRef.current = utter
     window.speechSynthesis.speak(utter)
   }, [onAdvance])
 
-  // Speak whenever the current line changes (and TTS is enabled)
+  // Auto-speak on line change ONLY — NOT on isEnabled change.
+  // toggle() handles the first utterance directly in user-gesture context.
+  // Subsequent utterances fire here, triggered by currentIndex advancing.
   useEffect(() => {
-    if (!isEnabled || !TTS_AVAILABLE) return
-    if (isComplete) { cancelSpeech(); return }
-    const line = lines[currentIndex]
-    if (line !== undefined) speakLine(line, rate)
-  }, [currentIndex, isEnabled]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!isEnabledRef.current || !TTS_AVAILABLE) return
+    if (isCompleteRef.current) { cancelSpeech(); return }
+    if (lines[currentIndex] !== undefined) speakLine(lines[currentIndex], rate)
+  }, [currentIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Stop when reading completes
+  // Stop on reading completion
   useEffect(() => {
-    if (isComplete && isEnabled) cancelSpeech()
+    if (isComplete && isEnabledRef.current) cancelSpeech()
   }, [isComplete]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggle() {
     const next = !isEnabled
+    // Update ref synchronously so speakLine's onend callback sees the right value
+    isEnabledRef.current = next
     setIsEnabled(next)
-    if (!next) cancelSpeech()
-    else if (!isComplete && lines[currentIndex] !== undefined) {
+    if (!next) {
+      cancelSpeech()
+    } else if (!isComplete && lines[currentIndex] !== undefined) {
+      // Called directly in user-gesture handler — Chrome allows speak() here
       speakLine(lines[currentIndex], rate)
     }
   }
 
   function togglePause() {
     if (!TTS_AVAILABLE) return
-    if (isSpeaking) {
-      window.speechSynthesis.pause()
+    const ss = window.speechSynthesis
+    if (ss.speaking && !ss.paused) {
+      ss.pause()
       setIsSpeaking(false)
-    } else {
-      window.speechSynthesis.resume()
+    } else if (ss.paused) {
+      ss.resume()
       setIsSpeaking(true)
+    } else {
+      // Not speaking and not paused (e.g. between lines) — restart current line
+      speakLine(lines[currentIndex], rate)
     }
   }
 
   function setRate(newRate) {
     setRateState(newRate)
     saveTTSRate(newRate)
-    // If currently speaking, restart the current line at the new rate
-    if (isEnabled && !isComplete) {
-      const line = lines[currentIndex]
-      if (line !== undefined) speakLine(line, newRate)
-    }
+    // Restart current line at new rate if actively speaking
+    if (isEnabledRef.current && !isComplete) speakLine(lines[currentIndex], newRate)
   }
 
   function stop() {
+    isEnabledRef.current = false
     setIsEnabled(false)
     cancelSpeech()
   }
