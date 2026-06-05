@@ -393,10 +393,8 @@ export default function FocusReader({
                 </svg>
               </button>
 
-              {/* Pause/resume — only while actively speaking or explicitly paused.
-                  Hidden between lines so users can't click it right after enabling
-                  TTS and accidentally interfere with the queued utterance. */}
-              {ttsEnabled && (isSpeaking || ttsPaused) && (
+              {/* Pause/resume — visible whenever TTS is on so users always have a manual control. */}
+              {ttsEnabled && (
                 <button
                   onClick={togglePause}
                   aria-label={isSpeaking ? 'Pause' : 'Resume'}
