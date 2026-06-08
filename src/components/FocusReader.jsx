@@ -261,7 +261,9 @@ export default function FocusReader({
 
   // ── TTS ──────────────────────────────────────────────────────────
   const { isEnabled: ttsEnabled, toggle: toggleTTS, isSpeaking, isPaused: ttsPaused,
-          togglePause, rate: ttsRate, setRate: setTTSRate, stop: stopTTS } = useTTS({
+          togglePause, rate: ttsRate, setRate: setTTSRate, stop: stopTTS,
+          voiceName: ttsVoiceName, setVoiceName: setTTSVoiceName,
+          voiceOptions: ttsVoiceOptions } = useTTS({
     lines, currentIndex, onAdvance: advance, isComplete,
   })
 
@@ -426,6 +428,25 @@ export default function FocusReader({
                 >
                   {[0.75, 1, 1.25, 1.5, 2].map(r => (
                     <option key={r} value={r}>{r}×</option>
+                  ))}
+                </select>
+              )}
+
+              {/* Voice selector — only when TTS is on and voices are available */}
+              {ttsEnabled && ttsVoiceOptions.length > 1 && (
+                <select
+                  value={ttsVoiceName}
+                  onChange={e => setTTSVoiceName(e.target.value)}
+                  aria-label="Voice"
+                  title="Choose voice"
+                  className="text-xs text-focus-600 bg-focus-50 hover:bg-focus-100
+                             border-none outline-none rounded-lg px-1.5 py-1 cursor-pointer
+                             transition-colors duration-150 max-w-[120px] truncate"
+                >
+                  {ttsVoiceOptions.map(v => (
+                    <option key={v.name} value={v.name}>
+                      {v.name.replace('Google ', '').replace(' (Enhanced)', '★').replace(' (Premium)', '★')}
+                    </option>
                   ))}
                 </select>
               )}

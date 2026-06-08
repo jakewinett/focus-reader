@@ -19,17 +19,61 @@ function saveRate(r) {
     localStorage.setItem(PREFS_KEY, JSON.stringify({ ...p, tts_rate: r }))
   } catch {}
 }
-
-function toSpeech(line) {
-  if (!line || !line.trim()) return ''
-  if (line.startsWith('§')) return line.slice(1).replace(/\n/g, '. ')
-  return line
+function loadVoiceName() {
+  try { return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}').tts_voice ?? '' }
+  catch { return '' }
+}
+function saveVoiceName(name) {
+  try {
+    const p = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}')
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ ...p, tts_voice: name }))
+  } catch {}
 }
 
 export const TTS_AVAILABLE = typeof window !== 'undefined' && 'speechSynthesis' in window
 
 // Pre-warm voices as early as possible so they're ready when the user clicks.
 if (TTS_AVAILABLE) window.speechSynthesis.getVoices()
+
+// Score an English voice: higher = more natural-sounding.
+// Chrome's "Google" voices (localService: false) are cloud-quality; they beat local system voices.
+// macOS Enhanced/Neural voices beat plain local voices.
+function scoreVoice(v) {
+  if (v.name.includes('Google') && v.lang === 'en-US') return 5
+  if (v.name.includes('Google')) return 4
+  if (/Enhanced|Premium|Neural/i.test(v.name)) return 3
+  if (v.localService && !/espeak/i.test(v.name) && v.lang === 'en-US') return 2
+  if (v.localService && !/espeak/i.test(v.name)) return 1
+  return 0
+}
+
+// Returns English voices sorted best-first.
+export function getSortedVoices() {
+  if (!TTS_AVAILABLE) return []
+  return window.speechSynthesis.getVoices()
+    .filter(v => v.lang.startsWith('en'))
+    .sort((a, b) => scoreVoice(b) - scoreVoice(a))
+}
+
+// Pick the best voice given a saved preference name.
+function resolveVoice(savedName) {
+  const voices = window.speechSynthesis.getVoices()
+  if (!voices.length) return null
+  if (savedName) {
+    const match = voices.find(v => v.name === savedName)
+    if (match) return match
+  }
+  // Fall back to highest-scoring English voice
+  const eng = voices.filter(v => v.lang.startsWith('en'))
+  const sorted = [...eng].sort((a, b) => scoreVoice(b) - scoreVoice(a))
+  return sorted[0] || voices[0] || null
+}
+
+function toSpeech(line) {
+  if (!line || !line.trim()) return ''
+  if (line.startsWith('§')) return line.slice(1).replace(/\n/g, '. ')
+  return line
+}
 
 // Retry wrapper: Chrome sometimes fires 'canceled' spuriously on the first
 // speak() call even when the queue was empty. Retry once with a short delay.
@@ -58,19 +102,31 @@ function speakWithRetry(utter, attempt = 0) {
 }
 
 export function useTTS({ lines, currentIndex, onAdvance, isComplete }) {
-  const [isEnabled,  setIsEnabled]  = useState(false)
-  const [isSpeaking, setIsSpeaking] = useState(false)
-  const [isPaused,   setIsPaused]   = useState(false)
-  const [rate,       setRateState]  = useState(loadRate)
+  const [isEnabled,      setIsEnabled]      = useState(false)
+  const [isSpeaking,     setIsSpeaking]     = useState(false)
+  const [isPaused,       setIsPaused]       = useState(false)
+  const [rate,           setRateState]      = useState(loadRate)
+  const [voiceName,      setVoiceNameState] = useState(loadVoiceName)
+  const [voiceOptions,   setVoiceOptions]   = useState(() => getSortedVoices())
 
   // Plain refs — no closure magic needed
-  const enabledRef  = useRef(false)
-  const completeRef = useRef(false)
-  const advanceRef  = useRef(onAdvance)
+  const enabledRef   = useRef(false)
+  const completeRef  = useRef(false)
+  const advanceRef   = useRef(onAdvance)
+  const voiceNameRef = useRef(loadVoiceName())
 
   useEffect(() => { enabledRef.current  = isEnabled },  [isEnabled])
   useEffect(() => { completeRef.current = isComplete }, [isComplete])
   useEffect(() => { advanceRef.current  = onAdvance  }, [onAdvance])
+  useEffect(() => { voiceNameRef.current = voiceName  }, [voiceName])
+
+  // Chrome loads voices asynchronously — refresh options when they arrive.
+  useEffect(() => {
+    if (!TTS_AVAILABLE) return
+    const refresh = () => setVoiceOptions(getSortedVoices())
+    window.speechSynthesis.addEventListener('voiceschanged', refresh)
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', refresh)
+  }, [])
 
   // The single utterance in flight
   const utterRef = useRef(null)
@@ -85,12 +141,8 @@ export function useTTS({ lines, currentIndex, onAdvance, isComplete }) {
       return
     }
 
-    // Pick a voice. Attempt each call to getVoices() in case they loaded since last call.
-    const voices    = window.speechSynthesis.getVoices()
-    const engVoice  = voices.find(v => v.lang.startsWith('en') && v.localService)
-                   || voices.find(v => v.lang.startsWith('en'))
-                   || voices[0]
-                   || null
+    // Resolve voice: honour saved preference, fall back to highest-quality English voice.
+    const engVoice = resolveVoice(voiceNameRef.current)
 
     const utter     = new SpeechSynthesisUtterance(speech)
     utter.rate      = spRate ?? 1.0
@@ -192,5 +244,20 @@ export function useTTS({ lines, currentIndex, onAdvance, isComplete }) {
     setIsPaused(false)
   }
 
-  return { isEnabled, toggle, isSpeaking, isPaused, togglePause, rate, setRate, stop }
+  function setVoiceName(name) {
+    voiceNameRef.current = name
+    setVoiceNameState(name)
+    saveVoiceName(name)
+    // Restart current line with the new voice if TTS is active
+    if (enabledRef.current && !isComplete) {
+      const line = lines[currentIndex]
+      if (line !== undefined) speak(line, rate)
+    }
+  }
+
+  return {
+    isEnabled, toggle, isSpeaking, isPaused, togglePause,
+    rate, setRate, stop,
+    voiceName, setVoiceName, voiceOptions,
+  }
 }
