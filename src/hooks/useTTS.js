@@ -36,15 +36,28 @@ export const TTS_AVAILABLE = typeof window !== 'undefined' && 'speechSynthesis' 
 if (TTS_AVAILABLE) window.speechSynthesis.getVoices()
 
 // Score an English voice: higher = more natural-sounding.
-// Chrome's "Google" voices (localService: false) are cloud-quality; they beat local system voices.
-// macOS Enhanced/Neural voices beat plain local voices.
+//
+// Priority ladder:
+//  6 — Google US English (Chrome cloud TTS, very natural)
+//  5 — Any other Google voice
+//  4 — Explicitly labelled Enhanced / Premium / Neural
+//  3 — Apple Siri-generation neural families (macOS 13+): Sandy, Shelley, Reed,
+//       Rocko, Flo, Eddy, Grandma, Grandpa — sound like real people, no label.
+//       en-US variants preferred over other locales.
+//  2 — Same families, non-US locale
+//  1 — Any other local en-US voice (e.g. Samantha, Daniel)
+//  0 — Any other local voice
+// -1 — eSpeak or non-local fallback (avoid)
+const SIRI_FAMILIES = /^(Sandy|Shelley|Reed|Rocko|Flo|Eddy|Grandma|Grandpa)\b/i
 function scoreVoice(v) {
-  if (v.name.includes('Google') && v.lang === 'en-US') return 5
-  if (v.name.includes('Google')) return 4
-  if (/Enhanced|Premium|Neural/i.test(v.name)) return 3
-  if (v.localService && !/espeak/i.test(v.name) && v.lang === 'en-US') return 2
-  if (v.localService && !/espeak/i.test(v.name)) return 1
-  return 0
+  if (v.name.includes('Google') && v.lang === 'en-US') return 6
+  if (v.name.includes('Google')) return 5
+  if (/Enhanced|Premium|Neural/i.test(v.name)) return 4
+  if (SIRI_FAMILIES.test(v.name) && v.lang === 'en-US') return 3
+  if (SIRI_FAMILIES.test(v.name)) return 2
+  if (v.localService && !/espeak/i.test(v.name) && v.lang === 'en-US') return 1
+  if (v.localService && !/espeak/i.test(v.name)) return 0
+  return -1
 }
 
 // Returns English voices sorted best-first.

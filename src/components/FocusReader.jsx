@@ -445,7 +445,12 @@ export default function FocusReader({
                 >
                   {ttsVoiceOptions.map(v => (
                     <option key={v.name} value={v.name}>
-                      {v.name.replace('Google ', '').replace(' (Enhanced)', '★').replace(' (Premium)', '★')}
+                      {v.name
+                        .replace(/\s*\(English \([^)]+\)\)/g, '')  // "Sandy (English (United States))" → "Sandy"
+                        .replace('Google ', '')                      // "Google US English" → "US English"
+                        .replace(/ \(Enhanced\)$/, ' ★')
+                        .replace(/ \(Premium\)$/, ' ★')
+                        .trim() || v.name}
                     </option>
                   ))}
                 </select>
