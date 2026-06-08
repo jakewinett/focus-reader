@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { UserButton, SignInButton, SignUpButton } from '@clerk/react'
+import { UserButton, SignInButton } from '@clerk/react'
+import GoogleButton from './GoogleButton.jsx'
 import { useAppAuth } from '../lib/AuthContext.jsx'
 import { loadAssignments, saveAssignments, clearAssignments, loadCourses } from '../storage/state.js'
 import EvanoryLogo from './EvanoryLogo.jsx'
@@ -294,12 +295,12 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
                     Sign in
                   </button>
                 </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="text-xs font-medium px-3 py-1.5 bg-focus-600 text-white
-                                     rounded-lg hover:bg-focus-700 transition-colors">
-                    Sign up free
-                  </button>
-                </SignUpButton>
+                <GoogleButton label="Sign up free" className={[
+                  'flex items-center gap-1.5 text-xs font-medium',
+                  'px-3 py-1.5 rounded-lg bg-white border border-ink-200',
+                  'text-ink-800 hover:bg-ink-50 hover:border-ink-300',
+                  'transition-colors duration-150 shadow-sm',
+                ].join(' ')} />
               </div>
             )}
             {CLERK_ENABLED && isSignedIn && <UserButton afterSignOutUrl="/" />}
