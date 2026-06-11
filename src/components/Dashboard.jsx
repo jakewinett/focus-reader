@@ -205,7 +205,7 @@ function CourseCard({ name, done, total, pct, teacher, schedule }) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-export default function Dashboard({ onGoToLanding, onStartReading, onReParse, onContinueReading }) {
+export default function Dashboard({ onGoToLanding, onStartReading, onReParse, onContinueReading, onViewFlagged }) {
   const { isSignedIn } = useAppAuth()
   const [assignments, setAssignments]   = useState([])
   const [courses, setCourses]           = useState([])
@@ -390,9 +390,21 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
 
         {/* Zone 4 — Recent readings (Sprint 8) */}
         <section>
-          <h2 className="text-xs font-mono text-ink-400 uppercase tracking-wide mb-3">
-            Recent readings
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-mono text-ink-400 uppercase tracking-wide">
+              Recent readings
+            </h2>
+            <button
+              onClick={onViewFlagged}
+              className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700
+                         font-medium transition-colors duration-150"
+            >
+              <svg width="11" height="11" viewBox="0 0 14 14" fill="currentColor">
+                <path d="M3 1h8a1 1 0 0 1 1 1v10.5l-4.5-2-4.5 2V2a1 1 0 0 1 1-1Z"/>
+              </svg>
+              Review flagged
+            </button>
+          </div>
           <HistoryZone onContinueReading={onContinueReading} />
         </section>
 

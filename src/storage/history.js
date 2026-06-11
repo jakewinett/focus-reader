@@ -65,17 +65,18 @@ function countWords(rawText) {
 // ── Supabase ↔ app record mapping ─────────────────────────────────────────────
 function fromRow(row) {
   return {
-    id:         row.id,
-    title:      row.title,
-    source:     row.source,
-    fileName:   row.file_name,
-    rawText:    row.raw_text,
-    wordCount:  row.word_count,
-    totalLines: row.total_lines,
-    openedAt:   new Date(row.opened_at).getTime(),
-    lastReadAt: new Date(row.last_read_at).getTime(),
-    lastLine:   row.last_line,
-    isComplete: row.is_complete,
+    id:           row.id,
+    title:        row.title,
+    source:       row.source,
+    fileName:     row.file_name,
+    rawText:      row.raw_text ?? null,
+    wordCount:    row.word_count,
+    totalLines:   row.total_lines,
+    openedAt:     new Date(row.opened_at).getTime(),
+    lastReadAt:   new Date(row.last_read_at).getTime(),
+    lastLine:     row.last_line,
+    isComplete:   row.is_complete,
+    flaggedLines: row.flagged_lines ?? [],
   }
 }
 
@@ -101,24 +102,25 @@ export async function createHistoryRecord({ rawText, source = 'paste', fileName 
   if (isCloud()) {
     await supabase.from('reading_sessions').insert({
       id,
-      user_id:      _userId,
-      title:        record.title,
-      source:       record.source,
-      file_name:    record.fileName,
-      raw_text:     record.rawText,
-      word_count:   record.wordCount,
-      total_lines:  record.totalLines,
-      last_line:    0,
-      is_complete:  false,
-      opened_at:    new Date(now).toISOString(),
-      last_read_at: new Date(now).toISOString(),
+      user_id:       _userId,
+      title:         record.title,
+      source:        record.source,
+      file_name:     record.fileName,
+      raw_text:      record.rawText,
+      word_count:    record.wordCount,
+      total_lines:   record.totalLines,
+      last_line:     0,
+      is_complete:   false,
+      flagged_lines: [],
+      opened_at:     new Date(now).toISOString(),
+      last_read_at:  new Date(now).toISOString(),
     })
     return id
   }
 
   // Anonymous: IndexedDB
   const db = await dbPromise
-  await db.put(STORE_NAME, record)
+  await db.put(STORE_NAME, { ...record, flaggedLines: [] })
   const all = await db.getAllFromIndex(STORE_NAME, 'lastReadAt')
   if (all.length > MAX_ITEMS) {
     const toDelete = all.slice(0, all.length - MAX_ITEMS)
@@ -147,7 +149,7 @@ export async function loadHistory({ localOnly = false } = {}) {
   if (isCloud() && !localOnly) {
     const { data, error } = await supabase
       .from('reading_sessions')
-      .select('id,title,source,file_name,word_count,total_lines,last_line,is_complete,opened_at,last_read_at')
+      .select('id,title,source,file_name,word_count,total_lines,last_line,is_complete,flagged_lines,opened_at,last_read_at')
       .order('last_read_at', { ascending: false })
       .limit(MAX_ITEMS)
     if (error || !data) return []
@@ -188,4 +190,35 @@ export async function clearHistory() {
   }
   const db = await dbPromise
   await db.clear(STORE_NAME)
+}
+
+export async function saveFlaggedLines(id, flaggedLines) {
+  if (isCloud()) {
+    await supabase.from('reading_sessions')
+      .update({ flagged_lines: flaggedLines })
+      .eq('id', id)
+    return
+  }
+  const db = await dbPromise
+  const record = await db.get(STORE_NAME, id)
+  if (record) await db.put(STORE_NAME, { ...record, flaggedLines })
+}
+
+export async function getFlaggedSessions(daysBack) {
+  const since = Date.now() - daysBack * 24 * 60 * 60 * 1000
+  if (isCloud()) {
+    const { data } = await supabase
+      .from('reading_sessions')
+      .select('id,title,source,file_name,raw_text,flagged_lines,last_read_at,opened_at')
+      .gt('last_read_at', new Date(since).toISOString())
+      .order('last_read_at', { ascending: false })
+    return (data ?? [])
+      .filter(r => Array.isArray(r.flagged_lines) && r.flagged_lines.length > 0)
+      .map(fromRow)
+  }
+  const db = await dbPromise
+  const all = await db.getAllFromIndex(STORE_NAME, 'lastReadAt')
+  return all
+    .filter(r => r.lastReadAt > since && (r.flaggedLines?.length ?? 0) > 0)
+    .reverse()
 }

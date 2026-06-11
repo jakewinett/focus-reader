@@ -115,14 +115,20 @@ ${numbered}`
   } catch { return { sections: [], aiRemaining: null } }
 }
 
-export async function generateQuiz(lines) {
+export async function generateQuiz(lines, flaggedLines = []) {
   if (!isAIAvailable()) return null
 
-  const numbered = lines.map((l, i) => `${i}: ${l}`).join('\n')
+  const numbered      = lines.map((l, i) => `${i}: ${l}`).join('\n')
+  const hasFlagged    = flaggedLines.length > 0
+  const questionCount = hasFlagged ? 5 : 4
+  const flagNote      = hasFlagged
+    ? `\n\nThe reader flagged these lines as important: ${flaggedLines.join(', ')}. Include exactly 1–2 questions that test comprehension of those specific lines; set "fromFlag":true on those questions and "fromFlag":false on the rest.`
+    : ''
+
   const prompt =
-`Generate exactly 4 multiple-choice comprehension questions about this text.
+`Generate exactly ${questionCount} multiple-choice comprehension questions about this text.
 Return ONLY a JSON array — no explanation, no markdown fences:
-[{"question":"...","options":["A text","B text","C text","D text"],"correctIndex":0,"sourceLine":N,"explanation":"..."},...]
+[{"question":"...","options":["A text","B text","C text","D text"],"correctIndex":0,"sourceLine":N,"explanation":"...","fromFlag":false},...]
 
 Rules:
 - Test genuine comprehension, not trivial recall
@@ -130,12 +136,13 @@ Rules:
 - correctIndex: 0-3 (index into options array)
 - sourceLine: 0-indexed line number most relevant to the question
 - explanation: 1 sentence explaining why the answer is correct
+- fromFlag: boolean${flagNote}
 
 Text (${lines.length} lines):
 ${numbered}`
 
   try {
-    const data   = await callClaude({ max_tokens: 1024, messages: [{ role: 'user', content: prompt }], requestType: 'quiz' })
+    const data   = await callClaude({ max_tokens: 1280, messages: [{ role: 'user', content: prompt }], requestType: 'quiz' })
     const parsed = JSON.parse(extractJSON(data.content?.[0]?.text ?? ''))
     return {
       questions:    Array.isArray(parsed) && parsed.length ? parsed : null,

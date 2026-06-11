@@ -133,9 +133,16 @@ export default function Quiz({ lines, questions, isLoading, onExit }) {
 
       {/* Header */}
       <div className="px-6 py-4 border-b border-ink-100 flex items-center justify-between">
-        <span className="text-xs font-mono text-ink-400">
-          Question {step + 1} of {questions.length}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono text-ink-400">
+            Question {step + 1} of {questions.length}
+          </span>
+          {q.fromFlag && (
+            <span className="text-xs font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-md">
+              ★ Flagged section
+            </span>
+          )}
+        </div>
         {/* Progress dots */}
         <div className="flex items-center gap-1.5">
           {questions.map((_, i) => (

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Analytics } from '@vercel/analytics/react'
-import LandingView from './components/LandingView.jsx'
-import FocusReader from './components/FocusReader.jsx'
-import Dashboard   from './components/Dashboard.jsx'
+import LandingView    from './components/LandingView.jsx'
+import FocusReader    from './components/FocusReader.jsx'
+import Dashboard      from './components/Dashboard.jsx'
+import FlaggedReview  from './components/FlaggedReview.jsx'
 import MigrationPrompt from './components/MigrationPrompt.jsx'
 import { useAppAuth } from './lib/AuthContext.jsx'
 import { setSupabaseToken, SUPABASE_ENABLED } from './lib/supabase.js'
@@ -17,7 +18,7 @@ import {
 } from './storage/history.js'
 import { initState, loadAssignments } from './storage/state.js'
 
-// View states: 'landing' | 'dashboard' | 'reader'
+// View states: 'landing' | 'dashboard' | 'reader' | 'review'
 // Sprint 9: Clerk auth, Supabase cloud storage, anonymous session limits.
 
 // ── Offline banner ────────────────────────────────────────────────────────────
@@ -123,8 +124,9 @@ export default function App() {
     if (!record) return
     setInputText(record.rawText)
     setReadingMeta({
-      sessionId:   historyId,
-      initialLine: fromStart ? 0 : record.lastLine,
+      sessionId:           historyId,
+      initialLine:         fromStart ? 0 : record.lastLine,
+      initialFlaggedLines: record.flaggedLines ?? [],
     })
     setView('reader')
   }
@@ -150,6 +152,7 @@ export default function App() {
   }
 
   function handleGoToDashboard() { setView('dashboard') }
+  function handleViewFlagged()   { setView('review') }
   function handleReParse()       { handleGoToLanding('schedule') }
 
   // Hold render until Clerk resolves auth (avoids flash of wrong view)
@@ -182,6 +185,7 @@ export default function App() {
           onStartReading={() => handleGoToLanding('paste')}
           onReParse={handleReParse}
           onContinueReading={handleContinueReading}
+          onViewFlagged={handleViewFlagged}
         />
       )}
       {view === 'reader' && (
@@ -190,8 +194,12 @@ export default function App() {
           onExit={handleExitReader}
           sessionId={readingMeta?.sessionId ?? null}
           initialLine={readingMeta?.initialLine ?? 0}
+          initialFlaggedLines={readingMeta?.initialFlaggedLines ?? []}
           onSavePosition={saveReadingPosition}
         />
+      )}
+      {view === 'review' && (
+        <FlaggedReview onBack={handleGoToDashboard} />
       )}
     </div>
   )
