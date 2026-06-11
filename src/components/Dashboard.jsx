@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { UserButton, SignInButton, SignUpButton } from '@clerk/react'
+import { UserButton, SignInButton } from '@clerk/react'
+import GoogleButton from './GoogleButton.jsx'
 import { useAppAuth } from '../lib/AuthContext.jsx'
 import { loadAssignments, saveAssignments, clearAssignments, loadCourses } from '../storage/state.js'
 import EvanoryLogo from './EvanoryLogo.jsx'
@@ -204,7 +205,7 @@ function CourseCard({ name, done, total, pct, teacher, schedule }) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-export default function Dashboard({ onGoToLanding, onStartReading, onReParse, onContinueReading }) {
+export default function Dashboard({ onGoToLanding, onStartReading, onReParse, onContinueReading, onViewFlagged }) {
   const { isSignedIn } = useAppAuth()
   const [assignments, setAssignments]   = useState([])
   const [courses, setCourses]           = useState([])
@@ -294,12 +295,12 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
                     Sign in
                   </button>
                 </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="text-xs font-medium px-3 py-1.5 bg-focus-600 text-white
-                                     rounded-lg hover:bg-focus-700 transition-colors">
-                    Sign up free
-                  </button>
-                </SignUpButton>
+                <GoogleButton label="Sign up free" className={[
+                  'flex items-center gap-1.5 text-xs font-medium',
+                  'px-3 py-1.5 rounded-lg bg-white border border-ink-200',
+                  'text-ink-800 hover:bg-ink-50 hover:border-ink-300',
+                  'transition-colors duration-150 shadow-sm',
+                ].join(' ')} />
               </div>
             )}
             {CLERK_ENABLED && isSignedIn && <UserButton afterSignOutUrl="/" />}
@@ -389,9 +390,21 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
 
         {/* Zone 4 — Recent readings (Sprint 8) */}
         <section>
-          <h2 className="text-xs font-mono text-ink-400 uppercase tracking-wide mb-3">
-            Recent readings
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-mono text-ink-400 uppercase tracking-wide">
+              Recent readings
+            </h2>
+            <button
+              onClick={onViewFlagged}
+              className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700
+                         font-medium transition-colors duration-150"
+            >
+              <svg width="11" height="11" viewBox="0 0 14 14" fill="currentColor">
+                <path d="M3 1h8a1 1 0 0 1 1 1v10.5l-4.5-2-4.5 2V2a1 1 0 0 1 1-1Z"/>
+              </svg>
+              Review flagged
+            </button>
+          </div>
           <HistoryZone onContinueReading={onContinueReading} />
         </section>
 

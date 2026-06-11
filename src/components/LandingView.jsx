@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { UserButton, SignInButton, SignUpButton } from '@clerk/react'
+import { UserButton, SignInButton } from '@clerk/react'
+import GoogleButton from './GoogleButton.jsx'
 import EvanoryLogo from './EvanoryLogo.jsx'
 import { extractFromPDF, extractFromDOCX } from '../utils/fileUtils.js'
 import { loadAssignments, saveAssignments, clearAssignments,
@@ -178,7 +179,7 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
             >
               ← Dashboard
             </button>
-            {/* Auth controls — sign in/up when anonymous, avatar when signed in */}
+            {/* Auth controls — Google button + sign-in link when anonymous, avatar when signed in */}
             {CLERK_ENABLED && !isSignedIn && (
               <div className="flex items-center gap-2">
                 <SignInButton mode="modal">
@@ -186,12 +187,12 @@ export default function LandingView({ onStartReading, initialTab = 'paste', onBa
                     Sign in
                   </button>
                 </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="text-xs font-medium px-3 py-1.5 bg-focus-600 text-white
-                                     rounded-lg hover:bg-focus-700 transition-colors">
-                    Sign up free
-                  </button>
-                </SignUpButton>
+                <GoogleButton label="Sign up free" className={[
+                  'flex items-center gap-1.5 text-xs font-medium',
+                  'px-3 py-1.5 rounded-lg bg-white border border-ink-200',
+                  'text-ink-800 hover:bg-ink-50 hover:border-ink-300',
+                  'transition-colors duration-150 shadow-sm',
+                ].join(' ')} />
               </div>
             )}
             {CLERK_ENABLED && isSignedIn && <UserButton afterSignOutUrl="/" />}

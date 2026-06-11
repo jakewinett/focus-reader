@@ -4,6 +4,7 @@ import { getBlockLabel } from '../utils/fileUtils.js'
 import { useReadingPace, useFontSize } from '../hooks/useReadingPace.js'
 import { useTTS, TTS_AVAILABLE } from '../hooks/useTTS.js'
 import { useDisplayPrefs } from '../hooks/useDisplayPrefs.js'
+import { useFlaggedLines } from '../hooks/useFlaggedLines.js'
 import { analyzeText, generateQuiz } from '../api/claude.js'
 import RateLimitBanner from './RateLimitBanner.jsx'
 import Quiz from './Quiz.jsx'
@@ -118,9 +119,10 @@ function SpacingRow({ spacing, onCycle }) {
 export default function FocusReader({
   rawText,
   onExit,
-  sessionId    = null,
-  initialLine  = 0,
-  onSavePosition = null,
+  sessionId           = null,
+  initialLine         = 0,
+  initialFlaggedLines = [],
+  onSavePosition      = null,
 }) {
   const lines      = parseLines(rawText)
   const totalLines = lines.length
@@ -147,6 +149,8 @@ export default function FocusReader({
   const { bionicMode, toggleBionic, dyslexiaFont, toggleDyslexia,
           lineSpacing, cycleSpacing, anyActive: anyFocusActive } = useDisplayPrefs()
 
+  const { flaggedLines, toggleFlag } = useFlaggedLines(sessionId, initialFlaggedLines)
+
   const containerRef  = useRef(null)
   const activeLineRef = useRef(null)
 
@@ -172,7 +176,7 @@ export default function FocusReader({
   useEffect(() => {
     if (!isComplete) return
     setIsGeneratingQuiz(true)
-    generateQuiz(lines)
+    generateQuiz(lines, [...flaggedLines].sort((a, b) => a - b))
       .then(result => {
         setQuizQuestions(result.questions ?? null)
         if (result.aiRemaining != null) setAiRemaining(result.aiRemaining)
@@ -261,7 +265,9 @@ export default function FocusReader({
 
   // ── TTS ──────────────────────────────────────────────────────────
   const { isEnabled: ttsEnabled, toggle: toggleTTS, isSpeaking, isPaused: ttsPaused,
-          togglePause, rate: ttsRate, setRate: setTTSRate, stop: stopTTS } = useTTS({
+          togglePause, rate: ttsRate, setRate: setTTSRate, stop: stopTTS,
+          voiceName: ttsVoiceName, setVoiceName: setTTSVoiceName,
+          voiceOptions: ttsVoiceOptions } = useTTS({
     lines, currentIndex, onAdvance: advance, isComplete,
   })
 
@@ -277,6 +283,9 @@ export default function FocusReader({
         case 'ArrowUp':
         case 'ArrowLeft':
           e.preventDefault(); retreat(); break
+        case 'f':
+        case 'F':
+          e.preventDefault(); toggleFlag(currentIndex); break
         default: break
       }
     }
@@ -429,7 +438,58 @@ export default function FocusReader({
                   ))}
                 </select>
               )}
+
+              {/* Voice selector — only when TTS is on and voices are available */}
+              {ttsEnabled && ttsVoiceOptions.length > 1 && (
+                <select
+                  value={ttsVoiceName}
+                  onChange={e => setTTSVoiceName(e.target.value)}
+                  aria-label="Voice"
+                  title="Choose voice"
+                  className="text-xs text-focus-600 bg-focus-50 hover:bg-focus-100
+                             border-none outline-none rounded-lg px-1.5 py-1 cursor-pointer
+                             transition-colors duration-150 max-w-[120px] truncate"
+                >
+                  {ttsVoiceOptions.map(v => (
+                    <option key={v.name} value={v.name}>
+                      {v.name
+                        .replace(/\s*\(English \([^)]+\)\)/g, '')  // "Sandy (English (United States))" → "Sandy"
+                        .replace('Google ', '')                      // "Google US English" → "US English"
+                        .replace(/ \(Enhanced\)$/, ' ★')
+                        .replace(/ \(Premium\)$/, ' ★')
+                        .trim() || v.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
+          )}
+
+          {/* ── Flag current line ── */}
+          {!isComplete && (
+            <button
+              onClick={() => toggleFlag(currentIndex)}
+              aria-pressed={flaggedLines.has(currentIndex)}
+              aria-label={flaggedLines.has(currentIndex) ? 'Unflag this line' : 'Flag as important'}
+              title="Flag as important (F)"
+              className={[
+                'w-7 h-7 flex items-center justify-center rounded-lg transition-colors duration-150 shrink-0',
+                flaggedLines.has(currentIndex)
+                  ? 'text-amber-500 bg-amber-50'
+                  : 'text-ink-400 hover:text-ink-700 hover:bg-ink-100',
+              ].join(' ')}
+            >
+              {flaggedLines.has(currentIndex) ? (
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                  <path d="M3 1h8a1 1 0 0 1 1 1v10.5l-4.5-2-4.5 2V2a1 1 0 0 1 1-1Z"/>
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M3 1h8a1 1 0 0 1 1 1v10.5l-4.5-2-4.5 2V2a1 1 0 0 1 1-1Z"
+                        stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </button>
           )}
 
           {/* ── Focus modes popover ── */}
@@ -536,13 +596,15 @@ export default function FocusReader({
             const sectionAtLine  = sections.find(s => s.startLine === index)
             const isSectionStart = !!sectionAtLine && index > 0
 
+            const isFlagged  = !isBlank && !isBlock && flaggedLines.has(index)
+
             const handleClick = () => {
               setCurrentIndex(index)
               if (isComplete) setIsComplete(false)
             }
 
             return (
-              <div key={index}>
+              <div key={index} className={isFlagged ? 'border-l-2 border-amber-300 pl-1' : ''}>
                 {isSectionStart && (
                   <div className="flex items-center gap-3 py-3 mt-2 mb-1 select-none">
                     <div className="flex-1 h-px bg-ink-100" />
