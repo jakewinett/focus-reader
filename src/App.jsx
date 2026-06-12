@@ -4,6 +4,7 @@ import LandingView    from './components/LandingView.jsx'
 import FocusReader    from './components/FocusReader.jsx'
 import Dashboard      from './components/Dashboard.jsx'
 import FlaggedReview  from './components/FlaggedReview.jsx'
+import MarketingPage  from './components/MarketingPage.jsx'
 import MigrationPrompt from './components/MigrationPrompt.jsx'
 import { useAppAuth } from './lib/AuthContext.jsx'
 import { setSupabaseToken, SUPABASE_ENABLED } from './lib/supabase.js'
@@ -18,7 +19,7 @@ import {
 } from './storage/history.js'
 import { initState, loadAssignments } from './storage/state.js'
 
-// View states: 'landing' | 'dashboard' | 'reader' | 'review'
+// View states: 'marketing' | 'landing' | 'dashboard' | 'reader' | 'review'
 // Sprint 9: Clerk auth, Supabase cloud storage, anonymous session limits.
 
 // ── Offline banner ────────────────────────────────────────────────────────────
@@ -55,13 +56,17 @@ export default function App() {
   const [showMigration, setShowMigration]       = useState(false)
   const [localSessionCount, setLocalSessionCount] = useState(0)
 
-  // Set initial view after async assignment load
+  // Set initial view based on auth state and existing assignments
   useEffect(() => {
     if (!isLoaded) return
+    if (!isSignedIn) {
+      setView('marketing')
+      return
+    }
     loadAssignments().then(a => {
       setView(a.length > 0 ? 'dashboard' : 'landing')
     })
-  }, [isLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoaded, isSignedIn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // FR-27: online/offline listener
   useEffect(() => {
@@ -171,6 +176,9 @@ export default function App() {
         />
       )}
 
+      {view === 'marketing' && (
+        <MarketingPage onTryApp={() => handleGoToLanding('paste')} />
+      )}
       {view === 'landing' && (
         <LandingView
           onStartReading={handleStartReading}
