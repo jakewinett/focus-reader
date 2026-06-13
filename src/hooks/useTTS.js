@@ -49,12 +49,15 @@ if (TTS_AVAILABLE) window.speechSynthesis.getVoices()
 //  0 — Any other local voice
 // -1 — eSpeak or non-local fallback (avoid)
 const SIRI_FAMILIES = /^(Sandy|Shelley|Reed|Rocko|Flo|Eddy|Grandma|Grandpa)\b/i
+const SIRI_VOICE    = /^Siri Voice [12]\b/i
 function scoreVoice(v) {
   if (v.name.includes('Google') && v.lang === 'en-US') return 6
   if (v.name.includes('Google')) return 5
   if (/Enhanced|Premium|Neural/i.test(v.name)) return 4
   if (SIRI_FAMILIES.test(v.name) && v.lang === 'en-US') return 3
+  if (SIRI_VOICE.test(v.name)    && v.lang === 'en-US') return 3
   if (SIRI_FAMILIES.test(v.name)) return 2
+  if (SIRI_VOICE.test(v.name))    return 2
   if (v.localService && !/espeak/i.test(v.name) && v.lang === 'en-US') return 1
   if (v.localService && !/espeak/i.test(v.name)) return 0
   return -1
@@ -66,6 +69,13 @@ export function getSortedVoices() {
   return window.speechSynthesis.getVoices()
     .filter(v => v.lang.startsWith('en'))
     .sort((a, b) => scoreVoice(b) - scoreVoice(a))
+}
+
+// True when no available voice scores ≥ 3 (i.e. no neural/cloud/Google voice).
+export function isTTSVoiceQualityLow() {
+  if (!TTS_AVAILABLE) return false
+  const best = getSortedVoices()[0]
+  return !best || scoreVoice(best) < 3
 }
 
 // Pick the best voice given a saved preference name.
@@ -134,10 +144,22 @@ export function useTTS({ lines, currentIndex, onAdvance, isComplete }) {
   useEffect(() => { voiceNameRef.current = voiceName  }, [voiceName])
 
   // Chrome loads voices asynchronously — refresh options when they arrive.
+  // Also auto-select the best voice if no preference has been saved yet.
   useEffect(() => {
     if (!TTS_AVAILABLE) return
-    const refresh = () => setVoiceOptions(getSortedVoices())
+    const refresh = () => {
+      const sorted = getSortedVoices()
+      setVoiceOptions(sorted)
+      if (!voiceNameRef.current && sorted.length) {
+        const best = sorted[0].name
+        voiceNameRef.current = best
+        setVoiceNameState(best)
+        saveVoiceName(best)
+      }
+    }
     window.speechSynthesis.addEventListener('voiceschanged', refresh)
+    // Also run immediately in case voices are already loaded (e.g. Safari)
+    refresh()
     return () => window.speechSynthesis.removeEventListener('voiceschanged', refresh)
   }, [])
 

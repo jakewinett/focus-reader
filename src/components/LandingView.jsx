@@ -27,7 +27,7 @@ const CLERK_ENABLED = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
 const PLACEHOLDER = `Paste your reading here — an article, textbook chapter, PDF text, or anything you need to get through.
 
-Evanory will highlight one line at a time so you can move through it without losing your place. When you're done, you'll get a short quiz to check what you retained.
+Evanreads will highlight one line at a time so you can move through it without losing your place. When you're done, you'll get a short quiz to check what you retained.
 
 Paste anything above this line and hit Start Reading.`
 

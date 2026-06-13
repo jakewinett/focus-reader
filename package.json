@@ -13,13 +13,16 @@
   "dependencies": {
     "@clerk/react": "^6.7.3",
     "@fontsource/opendyslexic": "^5.2.5",
+    "@stripe/react-stripe-js": "^6.6.0",
+    "@stripe/stripe-js": "^9.8.0",
     "@supabase/supabase-js": "^2.107.0",
     "@vercel/analytics": "^2.0.1",
     "idb": "^8.0.3",
     "mammoth": "^1.12.0",
     "pdfjs-dist": "^5.7.284",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "stripe": "^22.2.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.2",
