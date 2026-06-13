@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { parseLines, parseParagraphs, countWords, countTotalWords, formatMinutes, isBlankLine, bionicize } from '../utils/textUtils.js'
 import { getBlockLabel } from '../utils/fileUtils.js'
 import { useReadingPace, useFontSize } from '../hooks/useReadingPace.js'
-import { useTTS, TTS_AVAILABLE } from '../hooks/useTTS.js'
-import { useDisplayPrefs } from '../hooks/useDisplayPrefs.js'
+import { useTTS, TTS_AVAILABLE, isTTSVoiceQualityLow } from '../hooks/useTTS.js'
+import { useDisplayPrefs, HIGHLIGHT_COLORS } from '../hooks/useDisplayPrefs.js'
 import { useFlaggedLines } from '../hooks/useFlaggedLines.js'
 import { analyzeText, generateQuiz } from '../api/claude.js'
 import RateLimitBanner from './RateLimitBanner.jsx'
@@ -147,7 +147,9 @@ export default function FocusReader({
   const { estimatedMinutes, isCalibrated, recordProgress } = useReadingPace(totalWords)
   const { fontSize, increase, decrease }   = useFontSize()
   const { bionicMode, toggleBionic, dyslexiaFont, toggleDyslexia,
-          lineSpacing, cycleSpacing, anyActive: anyFocusActive } = useDisplayPrefs()
+          lineSpacing, cycleSpacing, anyActive: anyFocusActive,
+          darkMode, toggleDarkMode,
+          highlightColor, setHighlightColor } = useDisplayPrefs()
 
   const { flaggedLines, toggleFlag } = useFlaggedLines(sessionId, initialFlaggedLines)
 
@@ -309,7 +311,14 @@ export default function FocusReader({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div
+      className={`min-h-screen flex flex-col ${darkMode ? '' : 'bg-white'}`}
+      data-reader-dark={darkMode ? 'true' : undefined}
+      style={!darkMode ? {
+        '--hl-bg':     HIGHLIGHT_COLORS[highlightColor]?.bg     ?? HIGHLIGHT_COLORS.teal.bg,
+        '--hl-border': HIGHLIGHT_COLORS[highlightColor]?.border ?? HIGHLIGHT_COLORS.teal.border,
+      } : undefined}
+    >
 
       {/* ── Top bar ─────────────────────────────────────────── */}
       <header className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-ink-100">
@@ -331,7 +340,7 @@ export default function FocusReader({
 
           {/* Progress bar */}
           <div className="flex-1 flex items-center gap-3">
-            <div className="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden">
+            <div className="flex-1 h-1.5 reader-progress-track bg-ink-100 rounded-full overflow-hidden">
               <div
                 className="h-full bg-focus-500 rounded-full progress-fill"
                 style={{ width: `${progress}%` }}
@@ -462,6 +471,21 @@ export default function FocusReader({
                   ))}
                 </select>
               )}
+
+              {/* Low-quality voice warning */}
+              {ttsEnabled && isTTSVoiceQualityLow() && (
+                <span className="text-xs text-amber-600 dark:text-amber-400">
+                  For natural-sounding voice, use Chrome or{' '}
+                  <a
+                    href="x-apple.systempreferences:com.apple.preference.universalaccess?Spoken"
+                    className="underline"
+                    title="Open macOS Spoken Content settings"
+                  >
+                    download better voices
+                  </a>{' '}
+                  in System Settings.
+                </span>
+              )}
             </div>
           )}
 
@@ -492,6 +516,35 @@ export default function FocusReader({
             </button>
           )}
 
+          {/* ── Dark mode toggle ── */}
+          <button
+            onClick={toggleDarkMode}
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={darkMode ? 'Light mode' : 'Dark mode'}
+            className={[
+              'w-7 h-7 flex items-center justify-center rounded-lg transition-colors duration-150 shrink-0',
+              darkMode
+                ? 'text-yellow-400 bg-yellow-400/10 hover:bg-yellow-400/20'
+                : 'text-ink-400 hover:text-ink-700 hover:bg-ink-100',
+            ].join(' ')}
+          >
+            {darkMode ? (
+              /* Sun */
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <circle cx="7.5" cy="7.5" r="2.5" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M7.5 1v1.5M7.5 12.5V14M14 7.5h-1.5M2.5 7.5H1M11.95 3.05l-1.06 1.06M4.11 10.89l-1.06 1.06M11.95 11.95l-1.06-1.06M4.11 4.11L3.05 3.05"
+                      stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+            ) : (
+              /* Moon */
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <path d="M12.5 9.5A5.5 5.5 0 0 1 5.5 2.5a5.5 5.5 0 1 0 7 7Z"
+                      stroke="currentColor" strokeWidth="1.2"
+                      strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </button>
+
           {/* ── Focus modes popover ── */}
           <div className="relative shrink-0" ref={focusModeRef}>
             <button
@@ -516,11 +569,33 @@ export default function FocusReader({
 
             {showFocusModes && (
               <div className="absolute right-0 top-9 z-20 bg-white rounded-xl shadow-lg
-                              border border-ink-100 p-3 w-44 space-y-3 animate-fade-in">
+                              border border-ink-100 p-3 w-52 space-y-3 animate-fade-in">
                 <p className="text-xs font-semibold text-ink-400 uppercase tracking-wide">Focus modes</p>
                 <FocusModeRow label="Bionic reading" active={bionicMode}   onToggle={toggleBionic} />
                 <FocusModeRow label="Dyslexia font"  active={dyslexiaFont} onToggle={toggleDyslexia} />
                 <SpacingRow   spacing={lineSpacing}  onCycle={cycleSpacing} />
+                {!darkMode && (
+                  <div className="pt-1 border-t border-ink-100">
+                    <p className="text-xs font-semibold text-ink-400 uppercase tracking-wide mb-2">Highlight color</p>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {Object.entries(HIGHLIGHT_COLORS).map(([key, { bg, border, label }]) => (
+                        <button
+                          key={key}
+                          onClick={() => setHighlightColor(key)}
+                          title={label}
+                          aria-label={label}
+                          className="w-6 h-6 rounded-full transition-transform duration-100 hover:scale-110"
+                          style={{
+                            backgroundColor: bg,
+                            boxShadow: highlightColor === key
+                              ? `0 0 0 2px white, 0 0 0 3.5px ${border}`
+                              : `0 0 0 1.5px ${border}55`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -607,11 +682,11 @@ export default function FocusReader({
               <div key={index} className={isFlagged ? 'border-l-2 border-amber-300 pl-1' : ''}>
                 {isSectionStart && (
                   <div className="flex items-center gap-3 py-3 mt-2 mb-1 select-none">
-                    <div className="flex-1 h-px bg-ink-100" />
-                    <span className="text-xs font-mono text-ink-400 tracking-wide uppercase shrink-0">
+                    <div className="flex-1 h-px reader-section-divider bg-ink-100" />
+                    <span className="text-xs font-mono reader-section-label text-ink-400 tracking-wide uppercase shrink-0">
                       {sectionAtLine.title}
                     </span>
-                    <div className="flex-1 h-px bg-ink-100" />
+                    <div className="flex-1 h-px reader-section-divider bg-ink-100" />
                   </div>
                 )}
 

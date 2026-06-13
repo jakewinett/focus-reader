@@ -5,11 +5,11 @@ import GoogleButton from './GoogleButton.jsx'
 // page don't conflict. Text is rendered as HTML (not SVG text) so Quicksand
 // loads reliably from the page-level Google Fonts import.
 
-function EvanoryWordmark({ className = '' }) {
+function EvanreadsWordmark({ className = '' }) {
   return (
-    <div className={`flex items-center gap-2 select-none ${className}`}>
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 40 215 205"
-           width="28" height="28" aria-hidden="true">
+    <div className={`flex items-center gap-3 select-none ${className}`}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 30 245 230"
+           width="50" height="50" aria-hidden="true">
         <defs>
           <linearGradient id="nav-icon-g" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#0E8C8C" />
@@ -24,18 +24,18 @@ function EvanoryWordmark({ className = '' }) {
         </g>
       </svg>
       <span style={{ fontFamily: "'Quicksand', sans-serif", fontWeight: 700,
-                     fontSize: '18px', color: '#1F2E45', letterSpacing: '-0.4px',
+                     fontSize: '32px', color: '#1F2E45', letterSpacing: '-0.4px',
                      lineHeight: 1 }}>
-        <span style={{ color: '#0E8C8C' }}>E</span>vanory
+        <span style={{ color: '#0E8C8C' }}>E</span>vanreads
       </span>
     </div>
   )
 }
 
-function EvanoryWordmarkReversed({ className = '' }) {
+function EvanreadsWordmarkReversed({ className = '' }) {
   return (
     <div className={`flex items-center gap-2 select-none ${className}`}>
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 40 215 205"
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 30 245 230"
            width="28" height="28" aria-hidden="true">
         <defs>
           <linearGradient id="footer-icon-g" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -53,7 +53,7 @@ function EvanoryWordmarkReversed({ className = '' }) {
       <span style={{ fontFamily: "'Quicksand', sans-serif", fontWeight: 700,
                      fontSize: '18px', color: '#FFFFFF', letterSpacing: '-0.4px',
                      lineHeight: 1 }}>
-        <span style={{ color: '#2BC4C4' }}>E</span>vanory
+        <span style={{ color: '#2BC4C4' }}>E</span>vanreads
       </span>
     </div>
   )
@@ -61,7 +61,7 @@ function EvanoryWordmarkReversed({ className = '' }) {
 
 function BrandSymbol({ className = '' }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 40 215 205"
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 30 245 230"
          className={className} aria-hidden="true">
       <defs>
         <linearGradient id="hero-icon-g" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -114,7 +114,7 @@ const BENEFITS = [
       </svg>
     ),
     headline: 'Know your reading time',
-    body: 'See exactly how long an assignment will take before you start — no more guessing.',
+    body: 'Automatically estimates how long each assignment will take which then updates as you go — no more guessing.',
   },
   {
     icon: (
@@ -125,7 +125,7 @@ const BENEFITS = [
       </svg>
     ),
     headline: 'Feel confident in your retention',
-    body: 'Post-reading quizzes built from what you just read — so you actually know it stuck.',
+    body: 'Post-reading quizzes dynamically created from what you just read — so you can prove that it actually stuck, or help you reinforce what you might have missed.',
   },
 ]
 
@@ -172,16 +172,19 @@ const STUDIES = [
     claim: 'Active recall beats re-reading',
     body: 'Students who self-test on material retain significantly more over time than those who re-read the same passages passively.',
     cite: 'Roediger & Karpicke, Psychological Science, 2006',
+    href: 'https://pubmed.ncbi.nlm.nih.gov/16507066/',
   },
   {
-    claim: 'ADHD affects 1 in 5 college students',
-    body: 'Executive function differences make sustained reading especially challenging in higher education — not a motivation problem, a neurological one.',
-    cite: 'Weyandt & DuPaul, Developmental Disabilities Research Reviews, 2008',
+    claim: 'ADHD is common on campus — and underdiagnosed',
+    body: 'An estimated 2–8% of US college students have ADHD, and executive-function differences make sustained reading especially challenging in higher education — a neurological reality, not a motivation problem.',
+    cite: 'DuPaul, Weyandt, O\'Dell & Varejao, Journal of Attention Disorders, 2009',
+    href: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC3441934/',
   },
   {
     claim: 'Listening while reading improves comprehension',
-    body: 'Text-to-speech support reduces cognitive load and improves reading comprehension for students with ADHD, dyslexia, and processing differences.',
-    cite: 'Hecker, Burns, Elkind et al., Annals of Dyslexia, 2002',
+    body: 'Text-to-speech support measurably improves reading comprehension for students with reading disabilities, including ADHD, dyslexia, and processing differences.',
+    cite: 'Wood, Moxley, Tighe & Wagner, Journal of Learning Disabilities, 2018',
+    href: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC5494021/',
   },
 ]
 
@@ -210,51 +213,43 @@ const PLANS = [
     price: '$0',
     period: 'forever',
     features: [
-      '10 documents / month',
+      '20 documents / month',
       'PDF, DOCX, or paste text',
       'Text-to-speech',
-      'AI quiz (4 questions)',
+      '1 AI summary per document',
+      '2 AI quizzes per document',
     ],
     cta: 'Start free',
     featured: false,
   },
   {
-    name: 'Monthly',
-    price: '$4.99',
-    period: '/ month',
+    name: 'Student',
+    price: '$6',
+    period: '/ month  ·  or $60 / year',
     features: [
       'Unlimited documents',
-      'All free features',
-      '5-question quiz with flagged sections',
-      'Cross-session flagged review',
+      'Unlimited AI summaries',
+      'Unlimited AI quizzes',
       'Cloud sync',
+      '.edu email required',
     ],
-    cta: 'Get started',
+    cta: 'Get Student plan',
     featured: false,
+    badge: 'Most popular',
   },
   {
-    name: 'Semester',
-    price: '$22.99',
-    period: '/ 6 months ($3.83/mo)',
+    name: 'Standard',
+    price: '$9',
+    period: '/ month  ·  or $80 / year',
     features: [
-      'Everything in Monthly',
-      'Pause billing up to 3 months, no penalty',
+      'Unlimited documents',
+      'Unlimited AI summaries',
+      'Unlimited AI quizzes',
+      'Cloud sync',
+      'No .edu required',
     ],
-    cta: 'Get semester',
-    featured: false,
-  },
-  {
-    name: 'Annual',
-    price: '$29.99',
-    period: '/ year ($2.50/mo)',
-    features: [
-      'Everything in Monthly',
-      'Best per-month value',
-      'Pause billing up to 3 months, no penalty',
-    ],
-    cta: 'Get annual',
+    cta: 'Get Standard plan',
     featured: true,
-    badge: 'Best value',
   },
 ]
 
@@ -283,7 +278,7 @@ function Nav() {
   return (
     <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-ink-100">
       <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-        <EvanoryWordmark />
+        <EvanreadsWordmark />
         <div className="flex items-center gap-3">
           <GoogleButton
             label="Sign in"
@@ -306,7 +301,7 @@ function Hero({ onTryApp }) {
 
   return (
     <section className="max-w-3xl mx-auto px-6 pt-20 pb-16 text-center">
-      <BrandSymbol className="w-12 h-12 mx-auto mb-6" />
+      <BrandSymbol className="w-[86px] h-[86px] mx-auto mb-6" />
       <p className="text-[11px] font-semibold tracking-[0.2em] text-[#0E8C8C] uppercase mb-4">
         Built for ADHD &amp; learning differences
       </p>
@@ -314,12 +309,14 @@ function Hero({ onTryApp }) {
         className="text-3xl md:text-[42px] font-semibold text-ink-900 leading-tight mb-5 tracking-tight"
         style={{ fontFamily: "'Quicksand', sans-serif" }}
       >
-        Stop re-reading<br className="hidden sm:block" /> and start retaining.
+        Stop re-reading. Start retaining.
       </h1>
       <p className="text-base md:text-lg text-ink-500 leading-relaxed mb-10 max-w-[500px] mx-auto">
-        For students with ADHD and dyslexia, the same sentence can take ten tries — and still not
-        feel like it sank in. Evanory guides you through your reading one focused section at a time,
-        so you stay present, absorb more, and stop starting over.
+        For students struggling with ADHD and dyslexia, the same sentence can take ten tries — and still not
+        feel like it sank in.
+        <br /><br />
+        Evanreads guides you through your reading one focused section at a
+        time, so you stay present, absorb more, and stop feeling like your time is being wasted.
       </p>
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
         <PrimaryButton label="Start reading free" className="px-7 py-3.5 text-sm" />
@@ -404,12 +401,12 @@ function OriginStory() {
       <div className="max-w-2xl mx-auto px-6">
         <div className="border-l-[3px] border-[#0E8C8C] pl-8">
           <p className="text-base md:text-lg text-ink-700 leading-relaxed mb-4 font-medium">
-            I built Evanory for my son.
+            I built Evanreads for my son.
           </p>
           <p className="text-base text-ink-500 leading-relaxed mb-4">
-            When he started college with ADHD and autism, I watched him spend hours re-reading
-            the same pages — exhausted, frustrated, falling further behind. His tools weren't
-            built for how his brain works.
+            When he started college, I watched him spend hours re-reading the same pages —
+            exhausted, frustrated, falling further behind. His tools weren't built for how his
+            brain works.
           </p>
           <p className="text-base text-ink-500 leading-relaxed mb-6">
             So I built one that is.
@@ -439,7 +436,10 @@ function Research() {
             <div key={i} className="bg-white border border-ink-100 rounded-2xl p-6">
               <p className="text-sm font-semibold text-ink-800 mb-3 leading-snug">{s.claim}</p>
               <p className="text-sm text-ink-500 leading-relaxed mb-5">{s.body}</p>
-              <p className="text-[11px] text-ink-300 leading-snug">{s.cite}</p>
+              <a href={s.href} target="_blank" rel="noopener noreferrer"
+                 className="text-[11px] text-ink-500 leading-snug hover:text-focus-600 hover:underline">
+                {s.cite}
+              </a>
             </div>
           ))}
         </div>
@@ -489,7 +489,7 @@ function Pricing() {
           Simple pricing
         </h2>
         <p className="text-sm text-ink-400 text-center mb-12">Start free. Upgrade when you're ready.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {PLANS.map(plan => (
             <div
               key={plan.name}
@@ -548,7 +548,7 @@ function Pricing() {
           ))}
         </div>
         <p className="text-[11px] text-ink-300 text-center mt-6">
-          All paid plans include the option to pause billing for up to 3 months — no penalty.
+          Student plan requires a .edu email address, verified at checkout. Annual billing saves ~17%.
         </p>
       </div>
     </section>
@@ -563,7 +563,7 @@ function Feedback() {
       <div className="max-w-xl mx-auto px-6 text-center">
         <h2 className="text-lg font-semibold text-ink-800 mb-2">Help us improve</h2>
         <p className="text-sm text-ink-500 leading-relaxed mb-6">
-          Evanory is early-stage. Your feedback directly shapes what we build next.
+          Evanreads is early-stage. Your feedback directly shapes what we build next.
         </p>
         <a
           href={TYPEFORM_URL}
@@ -590,14 +590,14 @@ function Footer() {
   return (
     <footer className="bg-[#1F2E45] py-10">
       <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-6">
-        <EvanoryWordmarkReversed />
+        <EvanreadsWordmarkReversed />
         <nav className="flex items-center gap-6 text-xs text-[#6B8FA6]" aria-label="Footer links">
           <a href="/privacy" className="hover:text-white transition-colors duration-150">Privacy</a>
           <a href="/terms"   className="hover:text-white transition-colors duration-150">Terms</a>
-          <a href="mailto:hello@evanory.com"
+          <a href="mailto:hello@evanreads.ai"
              className="hover:text-white transition-colors duration-150">Contact</a>
         </nav>
-        <p className="text-xs text-[#6B8FA6]">© {new Date().getFullYear()} Evanory</p>
+        <p className="text-xs text-[#6B8FA6]">© {new Date().getFullYear()} Evanreads</p>
       </div>
     </footer>
   )

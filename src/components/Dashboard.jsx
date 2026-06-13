@@ -205,7 +205,7 @@ function CourseCard({ name, done, total, pct, teacher, schedule }) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-export default function Dashboard({ onGoToLanding, onStartReading, onReParse, onContinueReading, onViewFlagged }) {
+export default function Dashboard({ onGoToLanding, onStartReading, onReParse, onContinueReading, onViewFlagged, onGoToPricing }) {
   const { isSignedIn } = useAppAuth()
   const [assignments, setAssignments]   = useState([])
   const [courses, setCourses]           = useState([])
@@ -318,6 +318,15 @@ export default function Dashboard({ onGoToLanding, onStartReading, onReParse, on
                   fill="currentColor"/>
               </svg>
             </button>
+            {onGoToPricing && (
+              <button
+                onClick={onGoToPricing}
+                className="px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50
+                           rounded-lg hover:bg-indigo-100 transition-colors duration-150"
+              >
+                Upgrade
+              </button>
+            )}
             <button
               onClick={onGoToLanding}
               className="px-3 py-1.5 text-xs font-medium text-ink-600 bg-ink-100

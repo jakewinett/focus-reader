@@ -9,6 +9,7 @@ const defaults = {
   isLoaded:   true,
   isSignedIn: false,
   userId:     null,
+  userEmail:  null,
   getToken:   () => Promise.resolve(null),
 }
 

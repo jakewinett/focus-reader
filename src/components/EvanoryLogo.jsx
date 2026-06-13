@@ -1,4 +1,4 @@
-// Evanory wordmark — mark + logotype, used in header across all views.
+// Evanreads wordmark — mark + logotype, used in header across all views.
 // Mark uses inline SVG so no image request is needed and it scales crisp at any size.
 
 export default function EvanoryLogo() {
@@ -31,7 +31,7 @@ export default function EvanoryLogo() {
 
       {/* Wordmark */}
       <span className="font-brand font-bold text-lg tracking-tight text-ink-900 leading-none">
-        Evanory
+        Evanreads
       </span>
     </div>
   )

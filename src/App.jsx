@@ -5,6 +5,8 @@ import FocusReader    from './components/FocusReader.jsx'
 import Dashboard      from './components/Dashboard.jsx'
 import FlaggedReview  from './components/FlaggedReview.jsx'
 import MarketingPage  from './components/MarketingPage.jsx'
+import WaitlistPage   from './components/WaitlistPage.jsx'
+import PricingPage    from './components/PricingPage.jsx'
 import MigrationPrompt from './components/MigrationPrompt.jsx'
 import { useAppAuth } from './lib/AuthContext.jsx'
 import { setSupabaseToken, SUPABASE_ENABLED } from './lib/supabase.js'
@@ -19,7 +21,7 @@ import {
 } from './storage/history.js'
 import { initState, loadAssignments } from './storage/state.js'
 
-// View states: 'marketing' | 'landing' | 'dashboard' | 'reader' | 'review'
+// View states: 'marketing' | 'landing' | 'dashboard' | 'reader' | 'review' | 'pricing'
 // Sprint 9: Clerk auth, Supabase cloud storage, anonymous session limits.
 
 // ── Offline banner ────────────────────────────────────────────────────────────
@@ -159,6 +161,7 @@ export default function App() {
   function handleGoToDashboard() { setView('dashboard') }
   function handleViewFlagged()   { setView('review') }
   function handleReParse()       { handleGoToLanding('schedule') }
+  function handleGoToPricing()   { setView('pricing') }
 
   // Hold render until Clerk resolves auth (avoids flash of wrong view)
   if (!isLoaded) return null
@@ -177,7 +180,7 @@ export default function App() {
       )}
 
       {view === 'marketing' && (
-        <MarketingPage onTryApp={() => handleGoToLanding('paste')} />
+        <WaitlistPage />
       )}
       {view === 'landing' && (
         <LandingView
@@ -194,6 +197,7 @@ export default function App() {
           onReParse={handleReParse}
           onContinueReading={handleContinueReading}
           onViewFlagged={handleViewFlagged}
+          onGoToPricing={handleGoToPricing}
         />
       )}
       {view === 'reader' && (
@@ -208,6 +212,9 @@ export default function App() {
       )}
       {view === 'review' && (
         <FlaggedReview onBack={handleGoToDashboard} />
+      )}
+      {view === 'pricing' && (
+        <PricingPage onUpgraded={handleGoToDashboard} onBack={handleGoToDashboard} />
       )}
     </div>
   )
