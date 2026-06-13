@@ -5,6 +5,7 @@ import FocusReader    from './components/FocusReader.jsx'
 import Dashboard      from './components/Dashboard.jsx'
 import FlaggedReview  from './components/FlaggedReview.jsx'
 import MarketingPage  from './components/MarketingPage.jsx'
+import WaitlistPage   from './components/WaitlistPage.jsx'
 import PricingPage    from './components/PricingPage.jsx'
 import MigrationPrompt from './components/MigrationPrompt.jsx'
 import { useAppAuth } from './lib/AuthContext.jsx'
@@ -179,7 +180,7 @@ export default function App() {
       )}
 
       {view === 'marketing' && (
-        <MarketingPage onTryApp={() => handleGoToLanding('paste')} />
+        <WaitlistPage />
       )}
       {view === 'landing' && (
         <LandingView
