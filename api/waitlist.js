@@ -1,7 +1,5 @@
 import nodemailer from 'nodemailer'
 
-export const config = { runtime: 'nodejs' }
-
 const CONFIRMATION_HTML = (email) => `
 <!DOCTYPE html>
 <html>
