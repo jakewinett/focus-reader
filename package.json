@@ -19,6 +19,7 @@
     "@vercel/analytics": "^2.0.1",
     "idb": "^8.0.3",
     "mammoth": "^1.12.0",
+    "nodemailer": "^8.0.11",
     "pdfjs-dist": "^5.7.284",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

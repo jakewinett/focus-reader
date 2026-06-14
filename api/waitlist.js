@@ -1,4 +1,67 @@
-export const config = { runtime: 'edge' }
+import nodemailer from 'nodemailer'
+
+export const config = { runtime: 'nodejs' }
+
+const CONFIRMATION_HTML = (email) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { margin: 0; padding: 0; background: #f4f7fb; font-family: 'Helvetica Neue', Arial, sans-serif; }
+    .wrapper { max-width: 560px; margin: 40px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    .hero { background: linear-gradient(160deg, #0F4C6E 0%, #112244 100%); padding: 40px 40px 32px; text-align: center; }
+    .mark { margin: 0 auto 20px; }
+    .wordmark { font-size: 22px; font-weight: 700; color: white; letter-spacing: -0.3px; }
+    .wordmark span { color: #5ECFCF; }
+    .hero h1 { color: white; font-size: 26px; font-weight: 700; margin: 20px 0 8px; line-height: 1.2; }
+    .hero p { color: rgba(255,255,255,0.65); font-size: 15px; margin: 0; }
+    .body { padding: 36px 40px; }
+    .body p { color: #374151; font-size: 15px; line-height: 1.65; margin: 0 0 16px; }
+    .highlight { background: #f0f9f9; border-left: 3px solid #0E8C8C; border-radius: 4px; padding: 14px 18px; margin: 24px 0; }
+    .highlight p { margin: 0; color: #0A3352; font-size: 14px; }
+    .footer { padding: 20px 40px; border-top: 1px solid #f0f0f0; text-align: center; }
+    .footer p { color: #9ca3af; font-size: 12px; margin: 0; }
+    .footer a { color: #0E8C8C; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="hero">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 30 245 230" width="56" height="56" class="mark">
+        <defs>
+          <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#5ECFCF" />
+            <stop offset="100%" stop-color="#6BAAF5" />
+          </linearGradient>
+        </defs>
+        <g transform="translate(30,30) scale(2.2)">
+          <path d="M 67.487 22.014 A 33 33 0 1 1 65.493 20.863" fill="none" stroke="url(#g)" stroke-width="15.5" stroke-linecap="round" />
+          <circle cx="68.15" cy="50" r="10.5" fill="#93C5FD" />
+        </g>
+      </svg>
+      <div class="wordmark"><span>E</span>vanreads</div>
+      <h1>You're on the list.</h1>
+      <p>We'll let you know the moment we launch.</p>
+    </div>
+    <div class="body">
+      <p>Thanks for signing up — we'll email <strong>${email}</strong> as soon as Evanreads is ready.</p>
+      <p>We're building a reading tool designed from the ground up for students with ADHD and dyslexia. Line-by-line focus, AI-powered retention quizzes, text-to-speech, and pace tracking — everything that's been missing.</p>
+      <div class="highlight">
+        <p>🎓 <strong>Student?</strong> If you have a .edu email address, you'll get 33% off at launch — $6/mo or $60/yr.</p>
+      </div>
+      <p>In the meantime, if you have questions or want to share feedback, just reply to this email.</p>
+      <p style="margin-bottom:0">— Jake, founder</p>
+    </div>
+    <div class="footer">
+      <p>© ${new Date().getFullYear()} Evanreads · <a href="https://evanreads.ai">evanreads.ai</a></p>
+      <p style="margin-top:6px">You're receiving this because you signed up at evanreads.ai</p>
+    </div>
+  </div>
+</body>
+</html>
+`
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
@@ -30,6 +93,7 @@ export default async function handler(req) {
     })
   }
 
+  // Save to Supabase
   const res = await fetch(`${supabaseUrl}/rest/v1/waitlist`, {
     method: 'POST',
     headers: {
@@ -41,14 +105,39 @@ export default async function handler(req) {
     body: JSON.stringify({ email }),
   })
 
-  // 409 = duplicate email — treat as success so we don't leak whether it exists
-  if (res.ok || res.status === 409) {
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200, headers: { 'Content-Type': 'application/json' },
+  const isDuplicate = res.status === 409
+  if (!res.ok && !isDuplicate) {
+    return new Response(JSON.stringify({ error: 'Could not save email' }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
     })
   }
 
-  return new Response(JSON.stringify({ error: 'Could not save email' }), {
-    status: 500, headers: { 'Content-Type': 'application/json' },
+  // Send confirmation email (only for new signups)
+  if (!isDuplicate && process.env.ZOHO_SMTP_PASSWORD) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.zoho.com',
+        port: 465,
+        secure: true,
+        auth: {
+          user: 'hello@evanreads.ai',
+          pass: process.env.ZOHO_SMTP_PASSWORD,
+        },
+      })
+
+      await transporter.sendMail({
+        from: '"Evanreads" <hello@evanreads.ai>',
+        to: email,
+        subject: "You're on the Evanreads waitlist 🎉",
+        html: CONFIRMATION_HTML(email),
+      })
+    } catch (err) {
+      // Don't fail the request if email sending fails — signup was saved
+      console.error('Confirmation email failed:', err.message)
+    }
+  }
+
+  return new Response(JSON.stringify({ ok: true }), {
+    status: 200, headers: { 'Content-Type': 'application/json' },
   })
 }
