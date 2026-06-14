@@ -114,23 +114,31 @@ export default async function handler(req) {
 
   // Send confirmation email (only for new signups)
   if (!isDuplicate && process.env.ZOHO_SMTP_PASSWORD) {
+    const emailTimeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('SMTP timeout')), 8000)
+    )
     try {
       const transporter = nodemailer.createTransport({
         host: 'smtp.zoho.com',
         port: 465,
         secure: true,
+        connectionTimeout: 6000,
+        greetingTimeout: 6000,
         auth: {
           user: 'hello@evanreads.ai',
           pass: process.env.ZOHO_SMTP_PASSWORD,
         },
       })
 
-      await transporter.sendMail({
-        from: '"Evanreads" <hello@evanreads.ai>',
-        to: email,
-        subject: "You're on the Evanreads waitlist 🎉",
-        html: CONFIRMATION_HTML(email),
-      })
+      await Promise.race([
+        transporter.sendMail({
+          from: '"Evanreads" <hello@evanreads.ai>',
+          to: email,
+          subject: "You're on the Evanreads waitlist 🎉",
+          html: CONFIRMATION_HTML(email),
+        }),
+        emailTimeout,
+      ])
     } catch (err) {
       // Don't fail the request if email sending fails — signup was saved
       console.error('Confirmation email failed:', err.message)
