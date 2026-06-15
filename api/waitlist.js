@@ -95,24 +95,42 @@ export default async function handler(req) {
     })
   }
 
-  // Send confirmation email via Resend
-  if (!isDuplicate && process.env.RESEND_API_KEY) {
-    try {
-      await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: 'Evanreads <hello@evanreads.ai>',
-          to: [email],
-          subject: "You're on the Evanreads waitlist 🎉",
-          html: CONFIRMATION_HTML(email),
-        }),
-      })
-    } catch (err) {
-      console.error('Confirmation email failed:', err.message)
+  if (!isDuplicate) {
+    // Add to Resend audience
+    if (process.env.RESEND_FULL_KEY) {
+      try {
+        await fetch('https://api.resend.com/audiences/8877a5f5-36a3-42af-9e52-fc753c804fc8/contacts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.RESEND_FULL_KEY}`,
+          },
+          body: JSON.stringify({ email, unsubscribed: false }),
+        })
+      } catch (err) {
+        console.error('Audience sync failed:', err.message)
+      }
+    }
+
+    // Send confirmation email
+    if (process.env.RESEND_API_KEY) {
+      try {
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: 'Evanreads <hello@evanreads.ai>',
+            to: [email],
+            subject: "You're on the Evanreads waitlist 🎉",
+            html: CONFIRMATION_HTML(email),
+          }),
+        })
+      } catch (err) {
+        console.error('Confirmation email failed:', err.message)
+      }
     }
   }
 
