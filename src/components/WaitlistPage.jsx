@@ -1,5 +1,38 @@
 import { useState } from 'react'
 
+const FAQS = [
+  {
+    q: 'What is Evanreads?',
+    a: 'Evanreads is a web-based reading tool built for students with ADHD and dyslexia. It guides you through your reading one focused section at a time, with text-to-speech, pace tracking, and retention quizzes — so you stay present and actually retain what you read.',
+  },
+  {
+    q: 'Who is Evanreads for?',
+    a: 'Evanreads is designed for college and high school students who struggle with reading comprehension due to ADHD, dyslexia, or other learning differences. It works with any reading material — textbooks, PDFs, articles, or Word documents.',
+  },
+  {
+    q: 'How is Evanreads different from just highlighting or re-reading?',
+    a: 'Re-reading is one of the least effective study strategies for long-term retention. Evanreads uses active recall (post-reading quizzes) and focused single-section reading to reduce cognitive load and improve how much you actually remember — backed by peer-reviewed research.',
+  },
+  {
+    q: 'Is Evanreads free?',
+    a: 'Yes — Evanreads has a free plan with no time limit. Paid plans unlock unlimited documents, AI-powered summaries, and more. Students with a .edu email get 33% off paid plans.',
+  },
+  {
+    q: 'When will Evanreads launch?',
+    a: 'We are currently in pre-launch development. Join the waitlist and we will email you the moment it is ready.',
+  },
+]
+
+const FAQ_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQS.map(f => ({
+    '@type': 'Question',
+    name: f.q,
+    acceptedAnswer: { '@type': 'Answer', text: f.a },
+  })),
+}
+
 const BENEFITS = [
   {
     icon: (
@@ -66,6 +99,7 @@ export default function WaitlistPage() {
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState('idle')
   const [errorMsg, setErrorMsg] = useState('')
+  const [openFaq, setOpenFaq] = useState(null)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -268,6 +302,39 @@ export default function WaitlistPage() {
             <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>Jake, father and founder</p>
             <div className="w-8 h-px" style={{ background: 'rgba(94,207,207,0.4)' }} />
           </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section className="px-6 pb-20 flex flex-col items-center">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_LD) }} />
+        <p className="text-xs font-semibold tracking-widest text-focus-600 uppercase mb-3">FAQ</p>
+        <h2 className="text-2xl md:text-3xl font-bold text-ink-900 text-center mb-10 max-w-lg leading-snug">
+          Common questions
+        </h2>
+        <div className="max-w-2xl w-full divide-y divide-ink-100">
+          {FAQS.map((f, i) => (
+            <div key={i}>
+              <button
+                onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                className="w-full flex items-center justify-between gap-4 py-5 text-left group"
+                aria-expanded={openFaq === i}
+              >
+                <span className="font-semibold text-ink-900 text-sm group-hover:text-focus-600 transition-colors">{f.q}</span>
+                <svg
+                  width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  className={`shrink-0 text-ink-400 transition-transform duration-200 ${openFaq === i ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              {openFaq === i && (
+                <p className="pb-5 text-sm text-ink-500 leading-relaxed">{f.a}</p>
+              )}
+            </div>
+          ))}
         </div>
       </section>
 
